@@ -10,11 +10,13 @@
 1. 구현 전에 반드시 계획을 먼저 제시한다.
 2. 수정할 파일 목록을 먼저 제시한다.
 3. 요청 범위 밖의 파일을 수정하지 않는다.
-4. DB 변경이 있으면 반드시 사전 보고한다. → 세부: `rules/rules-db-migration.md`
-5. 인증/권한/결제/주문/재고 관련 변경을 임의로 판단하지 않는다. → 세부: `rules/rules-sensitive-domain.md`
+4. DB 변경이 있으면 반드시 사전 보고한다. → 세부: `docs/rules-db-migration.md`
+5. 인증/권한/결제/주문/재고 관련 변경을 임의로 판단하지 않는다. → 세부: `docs/rules-sensitive-domain.md`
 6. 테스트 없는 기능을 완료로 보지 않는다.
-7. 변경 후 비전문가도 확인 가능한 검수 절차를 제공한다. → 양식: `rules/review-guide-template.md`
+7. 변경 후 비전문가도 확인 가능한 검수 절차를 제공한다. → 양식: `docs/review-guide-template.md`
 8. 테스트 실패 상태에서 머지하지 않는다.
+9. `.env` 파일은 수정하지 않는다. (필요시에는 `.env.example` 파일을 편집하여 가이드 제시)
+10. 코드를 제외한 주석과 진행과정 등의 설명은 `한국어`로 한다.
 
 ---
 
@@ -26,7 +28,7 @@
 - 승인되지 않은 범위는 이슈화하지 않음
 - PR 하나는 리뷰 가능한 크기로 유지 (가이드: 변경 파일 10개 이내 / diff 400줄 이내를 넘으면 분할 검토)
 
-세부 산출물/승인 주체 표: `rules/roles.md`
+세부 산출물/승인 주체 표: `docs/roles.md`
 
 ---
 
@@ -52,19 +54,19 @@
 
 - 완료 기준: 정상 케이스 + 주요 실패/예외 케이스 + 기존 테스트 회귀 통과
 - 테스트 실패 상태에서는 절대 머지하지 않는다 (예외 없음)
-- 세부: `rules/rules-code-quality.md`
+- 세부: `docs/rules-code-quality.md`
 
 ---
 
 ## 6. 세부 문서 (필요할 때 참조)
 
-- `rules/rules-sensitive-domain.md` — 인증/결제/주문/재고/개인정보 처리 세부 지침
-- `rules/rules-db-migration.md` — DB 스키마 변경 및 마이그레이션 원칙
-- `rules/rules-code-quality.md` — 코드/테스트 품질 기준
-- `rules/rules-git-workflow.md` — 브랜치/커밋/PR 규칙
-- `rules/rules-deploy-rollback.md` — 배포 및 롤백 원칙
-- `rules/review-guide-template.md` — 비전문가 검수 가이드 작성 양식
-- `rules/roles.md` — 역할과 책임(R&R), 단계별 산출물/승인 주체
-- `rules/changelog.md` — 본 규칙 문서의 개정 이력 및 개정 원칙
+- `docs/rules-sensitive-domain.md` — 인증/결제/주문/재고/개인정보 처리 세부 지침
+- `docs/rules-db-migration.md` — DB 스키마 변경 및 마이그레이션 원칙
+- `docs/rules-code-quality.md` — 코드/테스트 품질 기준
+- `docs/rules-git-workflow.md` — 브랜치/커밋/PR 규칙
+- `docs/rules-deploy-rollback.md` — 배포 및 롤백 원칙
+- `docs/review-guide-template.md` — 비전문가 검수 가이드 작성 양식
+- `docs/roles.md` — 역할과 책임(R&R), 단계별 산출물/승인 주체
+- `docs/changelog.md` — 본 규칙 문서의 개정 이력 및 개정 원칙
 
 > 위 세부 문서들은 해당 주제의 작업을 할 때 Claude가 직접 열어서 참조한다. 관련 없는 작업에서는 로드하지 않는다.
