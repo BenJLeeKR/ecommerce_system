@@ -1,0 +1,45 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+*.so
+
+# --- Environment ---
+.env
+.env.bak
+.env.org
+.env.example_bak
+
+# --- IDE / Editor ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- Cache / Cursor ---
+.cache*/
+.cursor/
+
+# --- Testing ---
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage/
+
+# --- Build ---
+dist/
+build/
+*.whl
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+.aider*
+node_modules/
+postgres_data/
