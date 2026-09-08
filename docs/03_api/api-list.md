@@ -246,7 +246,7 @@
 
 ## 6. Order API (주문) 🔴 위험 API
 
-> 이 그룹의 모든 API는 재고/결제와 직결되는 위험 영역이다. 구현 시 `docs/rules-sensitive-domain.md`와 `docs/02_domain/domain-model.md` 3~9장의 상태 흐름을 반드시 그대로 따른다.
+> 이 그룹의 모든 API는 재고/결제와 직결되는 위험 영역이다. 구현 시 `docs/01_governance/rules-sensitive-domain.md`와 `docs/02_domain/domain-model.md` 3~9장의 상태 흐름을 반드시 그대로 따른다.
 
 ### 6-1. 주문 생성 🔴
 - **Method/URL**: `POST /api/v1/orders`
