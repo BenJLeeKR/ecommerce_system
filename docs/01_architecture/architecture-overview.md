@@ -1,7 +1,7 @@
 # 아키텍처 개요 (Architecture Overview)
 
 > 상태: 초안 (Draft) — 설계 승인자(기획자) 검토 필요
-> 관련 문서: `docs/00_project/project-scope.md`, `docs/01_architecture/tech-stack-decision.md`
+> 관련 문서: `docs/00_project/project-scope.md`, `docs/00_project/tech-stack-decision.md`
 > 전제: 처음부터 MSA(마이크로서비스)로 시작하지 않고 **모듈러 모놀리스**로 시작하되, 주문/결제/재고/검색은 나중에 분리할 수 있도록 경계를 명확히 둔다.
 > 인프라 결정: DB는 서버 공용 PostgreSQL(Docker `my-shared-network`)을 사용하되, 이 프로젝트 **전용 Database**를 만들고 그 안에서는 **단일 Schema + 테이블 네이밍 규칙**으로 도메인을 구분한다. (5장 참고, 확정)
 
