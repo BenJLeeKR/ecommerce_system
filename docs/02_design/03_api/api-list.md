@@ -1,7 +1,7 @@
 # API 목록 (API List)
 
 > 상태: 초안 (Draft) — 설계 승인자(기획자) 검토 필요
-> 관련 문서: `docs/03_api/api-convention.md` (모든 API가 이 규칙을 따름), `docs/02_domain/domain-model.md`, `docs/04_database/database-design.md`
+> 관련 문서: `docs/02_design/03_api/api-convention.md` (모든 API가 이 규칙을 따름), `docs/02_design/02_domain/domain-model.md`, `docs/02_design/04_database/database-design.md`
 > 표시 규칙: 🔴 = 주문/결제/재고 관련 **위험 API** (별도 신중한 검토·테스트 필요), 🔒 = **관리자 권한 필수** API
 
 각 API는 **Method / URL / 설명 / 인증 필요 여부 / 권한 / 요청 파라미터 / 응답 요약 / 주요 실패 케이스** 순으로 정리했다.
@@ -246,7 +246,7 @@
 
 ## 6. Order API (주문) 🔴 위험 API
 
-> 이 그룹의 모든 API는 재고/결제와 직결되는 위험 영역이다. 구현 시 `docs/01_governance/rules-sensitive-domain.md`와 `docs/02_domain/domain-model.md` 3~9장의 상태 흐름을 반드시 그대로 따른다.
+> 이 그룹의 모든 API는 재고/결제와 직결되는 위험 영역이다. 구현 시 `docs/01_governance/rules-sensitive-domain.md`와 `docs/02_design/02_domain/domain-model.md` 3~9장의 상태 흐름을 반드시 그대로 따른다.
 
 ### 6-1. 주문 생성 🔴
 - **Method/URL**: `POST /api/v1/orders`

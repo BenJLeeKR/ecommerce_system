@@ -1,8 +1,8 @@
 # 화면 목록 (Screen List)
 
 > 상태: 초안 (Draft) — 설계 승인자(기획자) 검토 필요
-> 관련 문서: `docs/03_api/api-list.md`, `docs/01_architecture/architecture-overview.md` (프론트엔드는 `apps/web`(고객), `apps/admin`(관리자)로 분리)
-> 상세 화면 명세는 `docs/05_screen/screen-spec.md` 참고
+> 관련 문서: `docs/02_design/03_api/api-list.md`, `docs/02_design/01_architecture/architecture-overview.md` (프론트엔드는 `apps/web`(고객), `apps/admin`(관리자)로 분리)
+> 상세 화면 명세는 `docs/02_design/05_screen/screen-spec.md` 참고
 
 ## 화면 코드 규칙
 

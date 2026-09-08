@@ -1,7 +1,7 @@
 # 도메인 모델 (Domain Model)
 
 > 상태: 초안 (Draft) — 설계 승인자(기획자) 검토 필요
-> 관련 문서: `docs/00_project/project-scope.md`, `docs/01_architecture/architecture-overview.md`
+> 관련 문서: `docs/00_project/project-scope.md`, `docs/02_design/01_architecture/architecture-overview.md`
 > 이 문서는 코드가 아니라 "이 서비스에 어떤 개념들이 있고, 그것들이 서로 어떻게 얽혀 있는지"를 정의하는 문서다.
 
 ---

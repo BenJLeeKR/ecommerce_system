@@ -1,7 +1,7 @@
 # DB 설계 (Database Design)
 
 > 상태: 초안 (Draft) — 설계 승인자(기획자) 검토 필요
-> 관련 문서: `docs/01_architecture/architecture-overview.md`, `docs/02_domain/domain-model.md`, `docs/04_database/naming-conventions.md`
+> 관련 문서: `docs/02_design/01_architecture/architecture-overview.md`, `docs/02_design/02_domain/domain-model.md`, `docs/02_design/04_database/naming-conventions.md`
 > 전제: PostgreSQL 사용, 모듈러 모놀리스 구조에 맞춘 초기 설계, 주문/결제/재고는 명확히 분리, 실제 migration 파일은 아직 작성하지 않음.
 
 > **문서 구성 안내**: 요청하신 11개 항목 중 "테이블별 목적 / 주요 컬럼 / PK·FK / Unique 제약 / Index 후보 / 상태값 컬럼"(2~7번)은 테이블마다 흩어놓기보다 **테이블별로 한데 모아** 정리했다. 각 테이블 설명 안에서 해당 항목을 모두 확인할 수 있다. 나머지 항목(생성/수정/삭제일 정책, Soft Delete, 트랜잭션 주의사항, AI 규칙)은 전체 공통 사항이라 별도 장으로 뒀다.
@@ -510,7 +510,7 @@ erDiagram
 ## 7. DB 변경 시 AI 에이전트가 지켜야 할 규칙 (요청 항목 11)
 
 1. **이 문서에 정의되지 않은 테이블/컬럼을 임의로 추가하지 않는다.** 필요하다고 판단되면 먼저 사용자에게 제안하고 승인을 받는다.
-2. **`docs/04_database/naming-conventions.md`의 명명 규칙을 예외 없이 따른다.** (테이블명 복수형, 접두어 없음, PK는 UUID, 상태값은 문자열 등)
+2. **`docs/02_design/04_database/naming-conventions.md`의 명명 규칙을 예외 없이 따른다.** (테이블명 복수형, 접두어 없음, PK는 UUID, 상태값은 문자열 등)
 3. **주문/결제/재고와 관련된 FK는 반드시 ID 참조만 사용하고 DB 외래키 제약을 걸지 않는다.** 이 문서에서 "FK 제약 없음"으로 명시한 관계에 실수로 제약을 추가하지 않는다.
 4. **상태값(Enum) 컬럼에는 이 문서와 `domain-model.md`에 정의된 값만 사용한다.** 새로운 상태값이 필요하면 코드를 먼저 작성하지 않고 두 문서를 함께 갱신 제안한 뒤 승인을 받는다.
 5. **DB 스키마 변경(테이블/컬럼 추가·삭제·타입 변경)은 적용 전 반드시 사전 보고한다.** (작업 원칙의 절대 규칙 4, `docs/01_governance/rules-db-migration.md` 그대로 적용)
