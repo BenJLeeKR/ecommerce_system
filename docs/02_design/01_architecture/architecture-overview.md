@@ -1,7 +1,7 @@
 # 아키텍처 개요 (Architecture Overview)
 
 > 상태: 초안 (Draft) — 설계 승인자(기획자) 검토 필요
-> 관련 문서: `docs/00_project/project-scope.md`, `docs/01_architecture/tech-stack-decision.md`
+> 관련 문서: `docs/00_project/project-scope.md`, `docs/00_project/tech-stack-decision.md`
 > 전제: 처음부터 MSA(마이크로서비스)로 시작하지 않고 **모듈러 모놀리스**로 시작하되, 주문/결제/재고/검색은 나중에 분리할 수 있도록 경계를 명확히 둔다.
 > 인프라 결정: DB는 서버 공용 PostgreSQL(Docker `my-shared-network`)을 사용하되, 이 프로젝트 **전용 Database**를 만들고 그 안에서는 **단일 Schema + 테이블 네이밍 규칙**으로 도메인을 구분한다. (5장 참고, 확정)
 
@@ -305,7 +305,7 @@ Claude Code가 백엔드 기능을 구현할 때 반드시 지켜야 할 규칙�
 3. **도메인 간 데이터는 ID로만 참조한다.** 물리적으로 Schema가 나뉘어 있지 않으므로(단일 Schema + 테이블 네이밍 규칙, 5장 참고), DB가 실수를 막아주지 않는다. 특히 주문/결제/재고/검색 도메인의 테이블(`order_*`, `payment_*`, `inventory_*`, `search_*`) 사이에는 조인(JOIN)이나 데이터 복제를 하지 않고, 반드시 ID 참조 + 서비스 함수 호출로만 연결한다.
 4. **공용 로직은 지정된 공용 모듈(shared/common)에만 추가한다.** 여러 모듈에 같은 코드를 복사해서 넣지 않는다.
 5. **모듈 경계를 넘는 변경이 필요하면 먼저 계획을 보고한다.** "이 기능을 구현하려면 A 모듈과 B 모듈을 동시에 고쳐야 한다"는 판단이 서면, 구현 전에 반드시 계획과 영향범위를 먼저 제시한다. (절대 규칙 1, 2와 동일한 원칙)
-6. **주문/결제/재고 모듈을 수정할 때는 민감 영역 처리 지침을 함께 따른다.** (작업 원칙 문서의 `docs/rules-sensitive-domain.md` 참고)
+6. **주문/결제/재고 모듈을 수정할 때는 민감 영역 처리 지침을 함께 따른다.** (작업 원칙 문서의 `docs/01_governance/rules-sensitive-domain.md` 참고)
 
 ---
 

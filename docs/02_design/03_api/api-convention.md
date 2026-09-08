@@ -1,7 +1,7 @@
 # API 공통 규칙 (API Convention)
 
 > 상태: 초안 (Draft) — 설계 승인자(기획자) 검토 필요
-> 관련 문서: `docs/01_architecture/architecture-overview.md`, `docs/02_domain/domain-model.md`, `docs/03_database/naming-conventions.md`, `docs/04_database/database-design.md`
+> 관련 문서: `docs/02_design/01_architecture/architecture-overview.md`, `docs/02_design/02_domain/domain-model.md`, `docs/02_design/04_database/naming-conventions.md`, `docs/02_design/04_database/database-design.md`
 > 목적: 모든 API가 예외 없이 따를 공통 규칙을 먼저 정한다. `api-list.md`의 모든 API는 이 문서를 기준으로 설계되었다.
 
 ---

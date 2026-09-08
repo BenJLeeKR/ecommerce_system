@@ -1,7 +1,7 @@
 # 도메인 모델 (Domain Model)
 
 > 상태: 초안 (Draft) — 설계 승인자(기획자) 검토 필요
-> 관련 문서: `docs/00_project/project-scope.md`, `docs/01_architecture/architecture-overview.md`
+> 관련 문서: `docs/00_project/project-scope.md`, `docs/02_design/01_architecture/architecture-overview.md`
 > 이 문서는 코드가 아니라 "이 서비스에 어떤 개념들이 있고, 그것들이 서로 어떻게 얽혀 있는지"를 정의하는 문서다.
 
 ---
@@ -165,7 +165,7 @@ erDiagram
   - 하나의 주문에 대해 두 건 이상의 결제가 동시에 승인되어서는 안 된다(중복승인 방지, 7장 상세).
   - 결제 결과의 최종 확정은 반드시 PG의 서버-서버 콜백을 기준으로 한다.
 - **AI가 임의로 판단하면 안 되는 정책**
-  - 결제 승인/실패/취소 로직과 PG 연동 방식은 절대 임의로 구현하지 않는다. 반드시 사전 설계 승인과 결제 테스트(샌드박스) 검증을 거친다. (`docs/rules-sensitive-domain.md` 준수)
+  - 결제 승인/실패/취소 로직과 PG 연동 방식은 절대 임의로 구현하지 않는다. 반드시 사전 설계 승인과 결제 테스트(샌드박스) 검증을 거친다. (`docs/01_governance/rules-sensitive-domain.md` 준수)
 
 ### 2-11. Shipment (배송)
 

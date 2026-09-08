@@ -1,8 +1,8 @@
 # DB 명명 규칙 및 Enum 정의 (Naming Conventions)
 
 > 상태: 초안 (Draft) — 설계 승인자(기획자) 검토 필요
-> 관련 문서: `docs/01_architecture/architecture-overview.md` (5장 DB 구조), `docs/02_domain/domain-model.md`
-> 목적: 실제 테이블 설계(`docs/04_database/database-design.md`, 다음 단계)에 들어가기 전에, 모든 테이블/컬럼/상태값에 **일관되게 적용할 규칙**을 먼저 확정한다. 이 문서 확정 후에는 모든 테이블 설계가 이 규칙을 예외 없이 따른다.
+> 관련 문서: `docs/02_design/01_architecture/architecture-overview.md` (5장 DB 구조), `docs/02_design/02_domain/domain-model.md`
+> 목적: 실제 테이블 설계(`docs/02_design/04_database/database-design.md`, 다음 단계)에 들어가기 전에, 모든 테이블/컬럼/상태값에 **일관되게 적용할 규칙**을 먼저 확정한다. 이 문서 확정 후에는 모든 테이블 설계가 이 규칙을 예외 없이 따른다.
 
 ## 이번에 확정한 결정
 
@@ -70,7 +70,7 @@
 ### 3-2. 표기 규칙
 
 - Enum 값은 **대문자 스네이크케이스(UPPER_SNAKE_CASE)**로 표기한다. (예: `PENDING`, `PAYMENT_FAILED`)
-- `docs/02_domain/domain-model.md`에 정의된 상태값 이름을 그대로 사용한다 (새로 만들지 않음).
+- `docs/02_design/02_domain/domain-model.md`에 정의된 상태값 이름을 그대로 사용한다 (새로 만들지 않음).
 
 ### 3-3. 단일 진실 공급원 (Single Source of Truth)
 
@@ -80,7 +80,7 @@
 ### 3-4. 변경 정책
 
 - **값 추가**: 비교적 자유롭게 가능하나, 사전에 관련 도메인 문서(`domain-model.md`)를 함께 갱신한다.
-- **값 삭제/이름변경**: 기존 데이터에 영향을 주므로 DB 원칙(`docs/rules-db-migration.md`)에 따라 사전 보고 및 데이터 마이그레이션 계획을 함께 제시해야 한다.
+- **값 삭제/이름변경**: 기존 데이터에 영향을 주므로 DB 원칙(`docs/01_governance/rules-db-migration.md`)에 따라 사전 보고 및 데이터 마이그레이션 계획을 함께 제시해야 한다.
 - Claude Code는 이 문서와 `domain-model.md`에 없는 상태값을 임의로 추가하지 않는다.
 
 ### 3-5. 도메인별 Enum 목록 (현재까지 정의된 것)
@@ -155,6 +155,6 @@ payments
 - [x] 상태값 저장 방식(문자열 + 앱 검증) 확정
 - [ ] 컬럼 명명 규칙 승인
 - [ ] Prisma ↔ DB 매핑 규칙 승인
-- [ ] 다음 단계(`docs/04_database/database-design.md`, 전체 테이블/컬럼 설계) 진행 승인
+- [ ] 다음 단계(`docs/02_design/04_database/database-design.md`, 전체 테이블/컬럼 설계) 진행 승인
 
 > 승인 전까지는 초안(Draft) 상태이며, 코드는 작성하지 않는다.
