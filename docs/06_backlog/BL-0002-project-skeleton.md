@@ -3,7 +3,7 @@
 - 상태: Proposed
 - 우선순위: P0
 - 등록일: 2026-09-08
-- 관련 설계: `docs/00_project/tech-stack-decision.md`, `docs/01_architecture/architecture-overview.md`
+- 관련 설계: `docs/00_project/tech-stack-decision.md`, `docs/02_design/01_architecture/architecture-overview.md`
 
 ## 변경 이력
 

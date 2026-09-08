@@ -3,7 +3,7 @@
 - 상태: Proposed
 - 우선순위: P0
 - 등록일: 2026-09-08
-- 관련 설계: `docs/01_architecture/architecture-overview.md`, `docs/01_governance/rules-deploy-rollback.md`
+- 관련 설계: `docs/02_design/01_architecture/architecture-overview.md`, `docs/01_governance/rules-deploy-rollback.md`
 
 ## 변경 이력
 

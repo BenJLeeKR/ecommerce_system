@@ -1,7 +1,7 @@
 # 화면 명세 (Screen Spec)
 
 > 상태: 초안 (Draft) — 설계 승인자(기획자) 검토 필요
-> 관련 문서: `docs/05_screen/screen-list.md`(화면 코드/경로), `docs/03_api/api-list.md`(호출 API), `docs/02_domain/domain-model.md`(상태값/비즈니스 규칙)
+> 관련 문서: `docs/02_design/05_screen/screen-list.md`(화면 코드/경로), `docs/02_design/03_api/api-list.md`(호출 API), `docs/02_design/02_domain/domain-model.md`(상태값/비즈니스 규칙)
 > 표시 규칙: 🔴 = 주문/결제/재고 관련 위험 화면, 🔒 = 로그인 필요, 🔒🔒 = 관리자 권한 필요
 
 각 화면은 **목적 → 주요 사용자 → 진입 경로 → 와이어프레임 → 주요 UI 영역 → 입력 항목 → 버튼/액션 → 호출 API → Validation → 에러 케이스 → 비전문가 검수 포인트** 순서로 정리했다.
