@@ -10,6 +10,7 @@
 
 | 날짜 | 변경 내용 | 문서 |
 |---|---|---|
+| 2026-09-09 | 수동 main 병합, 테스트계 커밋 검증, 릴리스 태그 기반 운영 승격과 롤백 기준을 추가 | `rules-git-workflow.md`, `rules-deploy-rollback.md` |
 | 2026-09-09 | 공통 에이전트 작업 지도와 Jules·Claude Code 실행 프로필을 추가하고 R&R을 실행 에이전트 공통 책임으로 일반화 | `AGENTS.md`, `CLAUDE.md`, `roles.md`, `agent-execution-profiles.md`, `README.md` |
 | 2026-09-08 | Codex의 작업 설계·독립 검토와 Claude Code의 실행 책임을 구분하고, 사용자 승인 경계를 명시 | `roles.md`, `README.md` |
 | (최초 작성일) | 절대 규칙 8개 + 작업 원칙 최초 수립 | 전체 |
