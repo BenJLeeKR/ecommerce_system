@@ -2,7 +2,7 @@
 
 - 상태: Completed
 - 작업일: 2026-09-09
-- 연결 Backlog: `BL-0004` (또는 해당하는 Backlog)
+- 연결 Backlog: 없음 — AN-0005 결과 기반 신규 계획
 - 연결 Planning: `PL-0008`
 - 연결 Analysis: `AN-0005`
 - 관련 설계: `docs/02_design/01_architecture/architecture-overview.md`, `docs/02_design/04_database/database-design.md`
