@@ -11,3 +11,4 @@
 - [WL-0007](WL-0007-2026-09-09-agent-context-and-rr-update.md) — 공통 에이전트 작업 지도와 Jules·Claude Code R&R을 정리했다.
 - [WL-0008](WL-0008-2026-09-09-release-promotion-governance-update.md) — 테스트계 검증과 릴리스 태그 기반 운영 승격 기준을 정리했다.
 - [WL-0009](WL-0009-2026-09-09-github-jules-guardrails-readiness-check.md) — GitHub 보호·자동 병합·Jules 접근 상태를 읽기 전용으로 점검했다.
+- [WL-0010](WL-0010-2026-09-09-github-ruleset-jules-minimum-permission-proposal.md) — GitHub 보호 설정과 Jules 최소 권한의 승인안을 작성했다.
