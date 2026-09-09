@@ -9,3 +9,4 @@
 - [PL-0005](PL-0005-2026-09-09-agent-operating-governance-update.md) — Jules·Claude Code 운영 거버넌스 갱신 범위를 계획했다.
 - [PL-0006](PL-0006-2026-09-09-github-and-jules-guardrails.md) — GitHub 보호 규칙과 Jules 최소 권한 적용의 사전 점검·승인 범위를 계획했다.
 - [PL-0007](PL-0007-2026-09-09-github-ruleset-and-jules-minimum-permissions.md) — GitHub ruleset과 Jules 최소 권한의 정확한 설정값을 제안했다.
+- [PL-0008](PL-0008-2026-09-09-mvp-scalability-guardrails.md) — AN-0005에 따른 MVP 확장성 가드레일 계획을 수립했다.
