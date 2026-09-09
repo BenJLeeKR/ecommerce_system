@@ -32,7 +32,7 @@ AN-0005-2026-09-09-design-baseline-consistency-review.md의 분석 결과를 바
 
 ## 5. 검증 결과
 
-- GitHub `main` 기준 브랜치 분기 확인.
+- 최신 `main` 브랜치로 Rebase 완료 및 충돌 없음 확인.
 - `git diff --name-status`를 통해 정확히 4개의 파일만 생성 및 변경되었음을 검증.
 - `git diff --check` 명령어를 통해 공백이나 포맷팅 오류가 없음을 확인함.
 
