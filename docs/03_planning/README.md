@@ -6,3 +6,4 @@
 - [PL-0002](PL-0002-2026-09-08-governance-document-relocation.md) — 거버넌스 문서 재배치 범위를 계획했다.
 - [PL-0003](PL-0003-2026-09-08-design-document-relocation.md) — 승인된 설계 문서 재배치 범위를 기록했다.
 - [PL-0004](PL-0004-2026-09-08-archive-document-relocation.md) — 설계 archive 문서 재배치 범위를 계획했다.
+- [PL-0005](PL-0005-2026-09-09-agent-operating-governance-update.md) — Jules·Claude Code 운영 거버넌스 갱신 범위를 계획했다.
