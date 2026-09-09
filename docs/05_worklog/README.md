@@ -14,3 +14,4 @@
 - [WL-0010](WL-0010-2026-09-09-github-ruleset-jules-minimum-permission-proposal.md) — GitHub 보호 설정과 Jules 최소 권한의 승인안을 작성했다.
 - [WL-0011](WL-0011-2026-09-09-main-ruleset-application.md) — GitHub main 보호 ruleset을 적용하고 API로 활성 상태를 검증했다.
 - [WL-0012](WL-0012-2026-09-09-design-baseline-consistency-review.md) — 설계 정합성 검토 및 분석 문서 작성 작업을 기록했다.
+- [WL-0013](WL-0013-2026-09-09-mvp-scalability-guardrails.md) — AN-0005에 따른 MVP 확장성 가드레일 계획 문서를 작성했다.
