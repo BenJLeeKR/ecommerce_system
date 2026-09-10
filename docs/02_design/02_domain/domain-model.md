@@ -28,12 +28,10 @@ erDiagram
     ADMINUSER ||--o| AUTH : "인증정보 보유"
     USER ||--o| CART : "장바구니 보유"
     USER ||--o{ ORDER : "주문"
-    USER ||--o{ REVIEW : "작성"
 
     CATEGORY ||--o{ CATEGORY : "하위 카테고리"
     CATEGORY ||--o{ PRODUCT : "분류"
     PRODUCT ||--o{ PRODUCTOPTION : "옵션 조합"
-    PRODUCT ||--o{ REVIEW : "리뷰 대상"
     PRODUCTOPTION ||--|| INVENTORY : "재고 보유"
 
     CART ||--o{ PRODUCTOPTION : "담긴 항목(참조)"
@@ -54,7 +52,7 @@ erDiagram
 
 - **역할**: 서비스를 이용하는 일반 고객 계정
 - **주요 속성**: 이름, 이메일, 전화번호, 가입일, 회원 상태
-- **관계**: `Auth`(인증정보, 1:1) / `Cart`(1:1) / `Order`(1:N) / `Review`(1:N)
+- **관계**: `Auth`(인증정보, 1:1) / `Cart`(1:1) / `Order`(1:N)
 - **주요 상태값**: `ACTIVE`(정상), `DORMANT`(휴면), `WITHDRAWN`(탈퇴)
 - **비즈니스 규칙**
   - 이메일은 중복 가입이 불가하다.
@@ -78,7 +76,7 @@ erDiagram
 
 - **역할**: 판매 대상 상품의 기본 정보
 - **주요 속성**: 상품명, 설명, 기본가격, 대표이미지, 소속 카테고리, 판매상태
-- **관계**: `Category`(N:1), `ProductOption`(1:N), `Review`(1:N)
+- **관계**: `Category`(N:1), `ProductOption`(1:N)
 - **주요 상태값**: `ON_SALE`(판매중), `HIDDEN`(숨김), `DISCONTINUED`(단종)
 - **비즈니스 규칙**
   - 단종(`DISCONTINUED`) 처리된 상품은 신규 주문이 불가하지만, 과거 주문 내역에는 그대로 표시되어야 한다.
@@ -180,16 +178,7 @@ erDiagram
 
 ### 2-12. Review (리뷰) — 2차 고도화 대상
 
-> `project-scope.md`에서 2차 고도화로 분류된 기능이다. 지금 구현하지는 않지만, 향후 확장을 고려해 도메인 관계만 미리 정의해둔다.
-
-- **역할**: 구매한 상품에 대한 고객 평가
-- **주요 속성**: 작성자, 대상 상품, 평점, 내용, 작성일
-- **관계**: `User`(N:1), `Product`(N:1), `Order`/`OrderItem`(참조 — 실제 구매 확인용)
-- **주요 상태값**: 없음 (향후 노출/숨김/신고 처리 정책 추가 가능)
-- **비즈니스 규칙**
-  - 실제 구매(배송완료) 이력이 있는 고객만 리뷰를 작성할 수 있어야 한다.
-- **AI가 임의로 판단하면 안 되는 정책**
-  - 이 도메인은 MVP 범위가 아니므로, 별도 승인 없이 구현을 진행하지 않는다.
+> 리뷰는 MVP 범위 밖이며, 모델·API·스키마는 선반영하지 않고 MVP 이후 별도 설계·승인으로 진행한다.
 
 ### 2-13. AdminUser (관리자 계정)
 

@@ -342,43 +342,7 @@
 
 ## 9. Review API (리뷰) — 2차 고도화 대상
 
-> `project-scope.md`에 따라 **MVP 범위가 아니다.** API 구조만 미리 정의하며, 실제 구현은 별도 승인 후 진행한다.
-
-### 9-1. 리뷰 목록 조회
-- **Method/URL**: `GET /api/v1/products/{productId}/reviews`
-- **설명**: 특정 상품의 리뷰 목록
-- **인증**: 불필요
-- **권한**: 없음
-- **요청**: `page`, `size`, `sort`(`createdAt`,`rating`)
-- **응답 요약**: 리뷰 목록 + 페이징 메타
-- **주요 실패 케이스**: 상품 없음(`404`)
-
-### 9-2. 리뷰 작성
-- **Method/URL**: `POST /api/v1/products/{productId}/reviews`
-- **설명**: 구매 확정(배송완료) 상품에 대한 리뷰 작성
-- **인증**: 필요
-- **권한**: 본인, 해당 상품의 실제 구매(배송완료) 이력 필요
-- **요청**: `orderItemId`, `rating`, `content`
-- **응답 요약**: 생성된 리뷰
-- **주요 실패 케이스**: 구매 이력 없음(`403 REVIEW_PURCHASE_NOT_VERIFIED`), 중복 작성(`409 REVIEW_ALREADY_EXISTS`)
-
-### 9-3. 리뷰 수정
-- **Method/URL**: `PATCH /api/v1/reviews/{reviewId}`
-- **설명**: 본인이 작성한 리뷰 수정
-- **인증**: 필요
-- **권한**: 본인 작성 리뷰만
-- **요청**: `rating`, `content`
-- **응답 요약**: 수정된 리뷰
-- **주요 실패 케이스**: 타인 리뷰 접근(`403`)
-
-### 9-4. 리뷰 삭제
-- **Method/URL**: `DELETE /api/v1/reviews/{reviewId}`
-- **설명**: 리뷰 삭제 (Soft Delete)
-- **인증**: 필요
-- **권한**: 본인 작성자 또는 관리자
-- **요청**: 없음
-- **응답 요약**: `204 No Content`
-- **주요 실패 케이스**: 타인 리뷰 접근(`403`, 관리자 제외)
+> 리뷰는 MVP 범위 밖이며, 모델·API·스키마는 선반영하지 않고 MVP 이후 별도 설계·승인으로 진행한다.
 
 ---
 
@@ -570,7 +534,6 @@
 - [ ] Auth/User API 승인
 - [ ] Product/Category/Cart API 승인
 - [ ] Order/Payment/Shipment API 🔴 승인 (특히 상태 전이, 실패 케이스)
-- [ ] Review API 구조 승인 (MVP 미구현 확인)
 - [ ] Admin API 🔒 전체 권한 검증 방식 승인
 - [x] 화면 명세 검토 중 발견된 누락 API 4종 추가 완료 (상품 단건조회, 재고 목록조회, 회원 목록조회, 대시보드 통계)
 - [ ] ➕ 확인 필요 항목 일괄 검토 (탈퇴 제한, 비밀번호 재설정 요청 제한, 카테고리 삭제 시 소속상품 처리, 재고 조정 API 파라미터 방식, 대시보드 집계 기준)
