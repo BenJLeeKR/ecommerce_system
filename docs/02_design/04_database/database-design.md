@@ -281,7 +281,7 @@ erDiagram
 | held_at | TIMESTAMP | 예약(HOLD) 시각 |
 | confirmed_at | TIMESTAMP (nullable) | 확정(CONFIRM) 시각 |
 | released_at | TIMESTAMP (nullable) | 해제(RELEASE) 시각 |
-| expires_at | TIMESTAMP | 예약 유효시간(TTL) 만료 시각 (15분 기준 KST로 계산하여 UTC로 저장) |
+| expires_at | TIMESTAMP | 예약 유효시간(TTL) 만료 시각. 예약 시각(`held_at`)에 15분을 더한 UTC 기반 시각으로 저장한다. (만료 확인 스케줄러는 1분 단위이며 `Asia/Seoul` 기준) |
 | created_at | TIMESTAMP | 생성일 |
 
 - **PK/FK**: PK `id`. FK `inventory_id` → `inventory.id` (**FK 제약 있음**). `order_id`는 Order(🔴) 참조이므로 **FK 제약 없음**
