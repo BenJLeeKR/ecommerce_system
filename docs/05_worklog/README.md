@@ -22,3 +22,4 @@
 - [WL-0018](WL-0018-2026-09-10-sensitive-domain-policy-analysis.md) — 민감 도메인 정책 옵션 및 인프라 체크리스트 분석 작업을 기록했다.
 - [WL-0019](WL-0019-2026-09-10-sensitive-policy-design-alignment.md) — 승인 완료된 민감 도메인 정책 8건 및 초기 인프라 기준을 설계 문서에 정합화했다.
 - [WL-0020](WL-0020-2026-09-10-orchestrator-action-plan-draft.md) — 별도 Orchestrator 프로젝트 이전 전 Task Contract 기반 Action Plan 초안을 기록했다.
+- [WL-0021](WL-0021-2026-09-10-orchestrator-poc-checklist.md) — Thin Orchestrator Action Plan을 Superseded 문서로 전환하고 POC 수행 기록을 남겼다.
