@@ -4,16 +4,21 @@
 > 관련 문서: `docs/02_design/01_architecture/architecture-overview.md` (5장 DB 구조), `docs/02_design/02_domain/domain-model.md`
 > 목적: 실제 테이블 설계(`docs/02_design/04_database/database-design.md`, 다음 단계)에 들어가기 전에, 모든 테이블/컬럼/상태값에 **일관되게 적용할 규칙**을 먼저 확정한다. 이 문서 확정 후에는 모든 테이블 설계가 이 규칙을 예외 없이 따른다.
 
-## 이번에 확정한 결정
+## 승인된 규칙 (Approved)
 
 | 항목 | 결정 |
 |---|---|
 | 테이블명 표기 | **복수형** (`orders`, `order_items`) — PostgreSQL/Rails 관례 |
 | 도메인 접두어 사용 여부 | **미사용** — 테이블명은 접두어 없이 단순하게 (`users`, `orders`, `payments` 등). 도메인 경계는 테이블명이 아니라 문서(`architecture-overview.md`, `domain-model.md`)와 코드 규칙("ID 참조만, JOIN 금지")으로 관리 |
-| PK(기본키) 타입 | **UUID** — 추측 불가능, 보안에 유리 (특히 주문/결제 ID 순번 노출 방지) |
-| 상태값(Enum) 저장 방식 | **문자열(String)로 저장 + 애플리케이션 레이어에서 검증** (Postgres 네이티브 enum 타입 미사용) |
 
 > 도메인 접두어는 검토 과정에서 한국 SI/공공기관 관례(`ORD_`, `PAY_` 등 업무코드 접두어 + 대문자 + `PK_`/`FK_`류 제약조건 명명)와 최신 서비스 기업 관례(접두어 없는 단순한 `snake_case`)를 함께 검토했다. 이 프로젝트는 Prisma·NestJS 등 후자의 생태계를 기반으로 하므로, 접두어 없는 단순한 방식으로 확정했다.
+
+## 결정 대기 항목 (Pending)
+
+| 항목 | 제안 상태 |
+|---|---|
+| PK(기본키) 타입 | **UUID** — 추측 불가능, 보안에 유리 (특히 주문/결제 ID 순번 노출 방지) |
+| 상태값(Enum) 저장 방식 | **문자열(String)로 저장 + 애플리케이션 레이어에서 검증** (Postgres 네이티브 enum 타입 미사용) |
 
 ---
 
@@ -151,8 +156,8 @@ payments
 
 - [x] 테이블명 표기(복수형) 확정
 - [x] 도메인 접두어 미사용 확정 (SI 관례 vs 서비스기업 관례 검토 결과 반영)
-- [x] PK 타입(UUID) 확정
-- [x] 상태값 저장 방식(문자열 + 앱 검증) 확정
+- [ ] PK 타입(UUID) 확정
+- [ ] 상태값 저장 방식(문자열 + 앱 검증) 확정
 - [ ] 컬럼 명명 규칙 승인
 - [ ] Prisma ↔ DB 매핑 규칙 승인
 - [ ] 다음 단계(`docs/02_design/04_database/database-design.md`, 전체 테이블/컬럼 설계) 진행 승인

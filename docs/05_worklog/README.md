@@ -15,3 +15,4 @@
 - [WL-0011](WL-0011-2026-09-09-main-ruleset-application.md) — GitHub main 보호 ruleset을 적용하고 API로 활성 상태를 검증했다.
 - [WL-0012](WL-0012-2026-09-09-design-baseline-consistency-review.md) — 설계 정합성 검토 및 분석 문서 작성 작업을 기록했다.
 - [WL-0013](WL-0013-2026-09-09-mvp-scalability-guardrails.md) — AN-0005에 따른 MVP 확장성 가드레일 계획 문서를 작성했다.
+- [WL-0014](WL-0014-2026-09-10-approved-baseline-alignment.md) — 사용자 승인 완료 정책(스택, DB 네이밍 규칙 등)을 아키텍처 및 DB 문서에 정합화했다.
