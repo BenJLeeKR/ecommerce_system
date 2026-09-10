@@ -232,7 +232,7 @@
 
 - **주요 UI 영역**: 결과 아이콘, 안내 문구, 주문번호, 액션 버튼
 - **입력 항목**: 없음
-- **버튼/액션**: 성공 시 "주문내역 보기"(→`USR_ORDER_DETAIL`), 실패 시 "다시 시도"(→재결제 흐름, `POST /api/v1/orders/{orderId}/retry-payment`)
+- **버튼/액션**: 성공 시 "주문내역 보기"(→`USR_ORDER_DETAIL`), 실패 시 결제 시도 3회 미만일 경우 "다시 시도"(→재결제 흐름, `POST /api/v1/orders/{orderId}/retry-payment`), 3회 도달 시 "결제 시도 가능 횟수를 모두 사용했습니다. 주문 내역을 확인해 주세요." 안내 및 주문 내역 이동
 - **호출 API**: `GET /api/v1/orders/{orderId}`(최신 주문 상태 확인)
 - **Validation**: 없음
 - **에러 케이스**: 콜백 처리가 아직 끝나지 않아 상태가 `PENDING`으로 남아있는 경우 "결제 확인 중" 안내(➕ 확인 필요: 자동 새로고침/폴링 방식 및 간격 미정), 존재하지 않는 주문 접근(`404`)
@@ -320,9 +320,9 @@
 
 - **주요 UI 영역**: 주문 정보, 주문상품 목록, 배송지, 배송상태, 결제정보, 액션 버튼 영역
 - **입력 항목**: 취소 사유(선택, 취소 시)
-- **버튼/액션**: 주문취소(조건부 노출, `POST /api/v1/orders/{orderId}/cancel`), 재결제 시도(`PAYMENT_FAILED` 상태에서만 노출, `POST /api/v1/orders/{orderId}/retry-payment`)
+- **버튼/액션**: 주문취소(조건부 노출, `POST /api/v1/orders/{orderId}/cancel`), 재결제 시도(`PAYMENT_FAILED` 상태이고 누적 실패 3회 미만일 때만 노출, `POST /api/v1/orders/{orderId}/retry-payment`) 3회 도달 시 "결제 시도 가능 횟수를 모두 사용했습니다. 주문 내역을 확인해 주세요." 안내 및 주문 내역 이동
 - **호출 API**: `GET /api/v1/orders/{orderId}`, `GET /api/v1/orders/{orderId}/shipment`, (액션) `POST /api/v1/orders/{orderId}/cancel` 🔴, `POST /api/v1/orders/{orderId}/retry-payment` 🔴
-- **Validation**: 취소/재결제 버튼은 서버 규칙과 무관하게 화면에서도 상태 조건을 먼저 검사해 노출 여부를 결정 (아래 검수 포인트 참고)
+- **Validation**: 취소/재결제 버튼은 서버 규칙과 무관하게 화면에서도 상태 조건을 먼저 검사해 노출 여부를 결정 (아래 검수 포인트 참고). 단, 화면의 제한은 1차 UX 방어일 뿐이며 서버에서도 반드시 재결제 3회 초과를 차단해야 함.
 - **에러 케이스**: 이미 배송 시작되어 취소 불가(`409`, 안내 메시지로 대체), 재고 소진으로 재결제 불가(`409`, 이 경우 주문이 `CANCELED`로 전환됨을 안내)
 - **비전문가 검수 포인트**: **주문취소 버튼은 배송 시작 전 상태(`PENDING`/`PAYMENT_FAILED`/`PAID`/`PREPARING`)에서만 보이고, `SHIPPING`/`DELIVERED` 상태에서는 버튼 자체가 화면에 없어야 한다.** 이는 `domain-model.md` 9장의 "배송 시작 이후 취소 제한" 원칙이 실제 화면에서 지켜지는지 확인하는 핵심 포인트다. 버튼이 보이는데 눌렀을 때만 에러가 뜨는 방식은 부적절하다.
 
