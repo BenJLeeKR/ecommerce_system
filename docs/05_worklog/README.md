@@ -18,3 +18,4 @@
 - [WL-0014](WL-0014-2026-09-10-approved-baseline-alignment.md) — 사용자 승인 완료 정책(스택, DB 네이밍 규칙 등)을 아키텍처 및 DB 문서에 정합화했다.
 - [WL-0015](WL-0015-2026-09-10-kst-and-korean-writing-rules.md) — 공통 에이전트 한국어 작성 및 KST 시간 기준 규칙을 거버넌스 문서에 반영했다.
 - [WL-0016](WL-0016-2026-09-10-review-domain-mvp-deferral.md) — 리뷰 도메인을 MVP 범위 밖으로 정리하고, 모델·API·DB 설계 선반영을 제거했다.
+- [WL-0017](WL-0017-2026-09-10-review-ui-mvp-deferral.md) — 리뷰 도메인 MVP 제외 정책에 따라 화면 명세서의 리뷰 UI 선반영을 제거했다.
