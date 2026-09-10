@@ -1,8 +1,9 @@
 # WL-0018-2026-09-10-sensitive-domain-policy-analysis
 
+- 상태: Completed
 - 작성일: 2026-09-10
-- 연결 Planning: `PL-0008`
-- 연결 Analysis: `AN-0006`
+- 연결 Planning: `docs/03_planning/PL-0008-2026-09-09-mvp-scalability-guardrails.md`
+- 연결 Analysis: `docs/04_analysis/AN-0006-2026-09-10-sensitive-domain-policy-decision-options.md`
 - 연결 Backlog: 없음
 
 ## 1. 작업 내용
@@ -25,3 +26,10 @@
 
 - 사용자 결정 표(AN-0006)에 대해 사용자(기획/설계 의사결정권자)의 최종 승인을 요청합니다.
 - 승인이 완료된 이후 해당 정책들이 `architecture-overview.md` 등의 설계 문서에 반영되며, 본 코드를 구현하는 단계로 이행됩니다.
+
+## 5. 변경 파일 목록
+
+- `docs/04_analysis/AN-0006-2026-09-10-sensitive-domain-policy-decision-options.md` (신규 파일)
+- `docs/04_analysis/README.md`
+- `docs/05_worklog/WL-0018-2026-09-10-sensitive-domain-policy-analysis.md` (신규 파일)
+- `docs/05_worklog/README.md`
