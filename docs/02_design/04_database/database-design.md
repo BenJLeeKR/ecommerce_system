@@ -40,7 +40,6 @@
 | `order_items` | Order 🔴 | 주문에 포함된 개별 상품 |
 | `payments` | Payment 🔴 | 결제 시도 및 승인/실패 이력 |
 | `shipments` | Shipment | 배송 상태 |
-| `reviews` | Review | 상품 리뷰 (2차 고도화 대상, 구조만 선반영) |
 
 ---
 
@@ -50,13 +49,11 @@
 erDiagram
     USERS ||--o{ USER_ADDRESSES : "배송지 등록"
     USERS ||--o| CARTS : "장바구니 보유"
-    USERS ||--o{ REVIEWS : "작성"
 
     CATEGORIES ||--o{ CATEGORIES : "하위 카테고리"
     CATEGORIES ||--o{ PRODUCTS : "분류"
     PRODUCTS ||--o{ PRODUCT_OPTIONS : "옵션 조합"
     PRODUCTS ||--o{ PRODUCT_IMAGES : "이미지"
-    PRODUCTS ||--o{ REVIEWS : "리뷰 대상"
     PRODUCT_OPTIONS ||--|| INVENTORY : "재고 보유"
     INVENTORY ||--o{ INVENTORY_RESERVATIONS : "예약 이력"
 
@@ -67,7 +64,6 @@ erDiagram
     ORDER_ITEMS }o--|| PRODUCT_OPTIONS : "참조 (ID만, FK 제약 없음)"
     ORDERS ||--o{ PAYMENTS : "결제 시도"
     ORDERS ||--|| SHIPMENTS : "배송"
-    ORDER_ITEMS ||--o| REVIEWS : "구매 확인용 참조 (ID만, FK 제약 없음)"
     INVENTORY_RESERVATIONS }o--|| ORDERS : "예약 주체 참조 (ID만, FK 제약 없음)"
 ```
 
@@ -443,29 +439,9 @@ erDiagram
 
 ---
 
-### 3-16. reviews (리뷰) — 2차 고도화 대상, 구조만 선반영
+### 3-16. reviews (리뷰) — 2차 고도화 대상
 
-- **목적**: 구매 확정된 상품에 대한 고객 평가. 지금 단계에서는 기능을 구현하지 않지만, 테이블 구조는 요청에 따라 함께 설계한다.
-- **주요 컬럼**
-
-| 컬럼 | 타입 | 설명 |
-|---|---|---|
-| id | UUID | PK |
-| user_id | UUID | 작성자 (User, FK 제약 있음) |
-| product_id | UUID | 대상 상품 (Product, FK 제약 있음) |
-| order_item_id | UUID | 구매 확인용 참조 — Order 계열이므로 FK 제약 없음 |
-| rating | SMALLINT | 평점 (1~5) |
-| content | TEXT | 리뷰 내용 |
-| status | VARCHAR | 노출 상태 (➕ 신규 정의 — `domain-model.md`에 리뷰 상태값이 없어 이번에 최소 정의함, 문서 동기화 필요) |
-| created_at | TIMESTAMP | 작성일 |
-| updated_at | TIMESTAMP | 수정일 |
-| deleted_at | TIMESTAMP | 삭제(숨김) 시각 — Soft Delete |
-
-- **PK/FK**: PK `id`. FK `user_id` → `users.id`(**있음**), FK `product_id` → `products.id`(**있음**). `order_item_id`는 Order 계열 참조이므로 **FK 제약 없음**
-- **Unique 제약**: `(user_id, order_item_id)` — 같은 구매 건에 중복 리뷰 방지
-- **Index 후보**: `product_id`, `user_id`
-- **상태값**: `ACTIVE`, `HIDDEN` (➕ 신규 — `domain-model.md` 갱신 필요)
-- **주의**: 이 테이블/기능은 MVP 범위가 아니므로, 실제 구현은 별도 승인 후 진행한다.
+> 리뷰는 MVP 범위 밖이며, 모델·API·스키마는 선반영하지 않고 MVP 이후 별도 설계·승인으로 진행한다.
 
 ---
 
@@ -489,7 +465,7 @@ erDiagram
 | 방식 | 적용 테이블 | 이유 |
 |---|---|---|
 | **상태값으로 논리 삭제** (`deleted_at` 없이 `status`만 사용) | `users`(WITHDRAWN), `products`(DISCONTINUED), `product_options`(HIDDEN), `admin_users`(DISABLED) | 이미 상태값 개념이 있고, 참조 이력(주문 등)이 있어 완전히 사라지면 안 되는 데이터 |
-| **Soft Delete** (`deleted_at` 컬럼 사용) | `categories`, `user_addresses`, `reviews` | 상태값 개념이 없거나, 사용자가 "삭제"라고 인지하는 동작이 필요하지만 되돌릴 가능성을 남겨두는 것이 안전한 데이터 |
+| **Soft Delete** (`deleted_at` 컬럼 사용) | `categories`, `user_addresses` | 상태값 개념이 없거나, 사용자가 "삭제"라고 인지하는 동작이 필요하지만 되돌릴 가능성을 남겨두는 것이 안전한 데이터 |
 | **하드 삭제** (실제 행 삭제) | `carts`, `cart_items`, `product_images` | 이력 보존이 필요 없는 임시/자산 데이터 |
 | **삭제 없음** (개념 자체가 없음) | `orders`, `order_items`, `payments`, `shipments`, `inventory`, `inventory_reservations` | 거래/재고 기록은 영구 보존이 원칙 (금융/회계 및 분쟁 대응 목적) |
 
@@ -517,17 +493,16 @@ erDiagram
 6. **마이그레이션은 항상 되돌릴 수 있는 형태(down migration)로 작성한다.** 파괴적 변경(컬럼/테이블 삭제)은 2단계로 진행한다 (`docs/01_governance/rules-db-migration.md` 참고).
 7. **`orders`, `order_items`, `payments`, `shipments`에는 삭제 관련 컬럼이나 삭제 로직을 추가하지 않는다.** (5장 "삭제 없음" 원칙)
 8. **재고/결제 관련 트랜잭션 경계(6장)를 임의로 바꾸지 않는다.** 예를 들어 재고 확정과 결제 승인을 별도 트랜잭션으로 분리하는 등의 변경은 반드시 사전 승인 후 진행한다.
-9. **이 문서의 "➕ 확인 필요/신규 제안" 표시가 있는 항목**(카테고리 삭제 정책, 예약 TTL, 리뷰 상태값 등)은 실제 구현 전에 확정되어야 하며, 확정 전에는 관련 기능 구현에 착수하지 않는다.
+9. **이 문서의 "➕ 확인 필요/신규 제안" 표시가 있는 항목**(카테고리 삭제 정책, 예약 TTL 등)은 실제 구현 전에 확정되어야 하며, 확정 전에는 관련 기능 구현에 착수하지 않는다.
 
 ---
 
 ## 8. 승인 체크리스트
 
-- [ ] 전체 테이블 목록(16개) 및 ERD 확인
+- [ ] 전체 테이블 목록(15개) 및 ERD 확인
 - [ ] 테이블별 컬럼/PK·FK/Unique/Index 설계 승인
 - [ ] 삭제 정책(상태값 논리삭제 / Soft Delete / 하드 삭제 / 삭제 없음) 승인
 - [ ] 재고 예약 이력 테이블(`inventory_reservations`) 추가 확인
-- [ ] Review 상태값(➕ 신규 정의) `domain-model.md`에 반영
 - [ ] ➕ 확인 필요 항목 일괄 검토 (카테고리 삭제 정책, 재고 예약 TTL, 회원당 기본배송지 unique 처리 방식, 트랜잭션 격리수준/락 전략)
 - [ ] 다음 단계(실제 Prisma schema 작성 / migration 파일 생성) 진행 승인
 
