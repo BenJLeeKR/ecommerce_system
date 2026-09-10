@@ -290,7 +290,7 @@
 - **권한**: 본인 소유 주문만
 - **요청**: `paymentMethod`
 - **응답 요약**: 새 결제 시도 정보 (성공 시 `PENDING`으로 전환)
-- **주요 실패 케이스**: 재고 소진으로 재예약 실패(`409 ORDER_STOCK_INSUFFICIENT` → 이 경우 주문은 `CANCELED`로 전환됨), 이미 결제완료된 주문(`409 ORDER_ALREADY_PAID`), 취소된 주문(`409`)
+- **주요 실패 케이스**: 재고 소진으로 재예약 실패(`409 ORDER_STOCK_INSUFFICIENT` → 이 경우 주문은 `CANCELED`로 전환됨), 이미 결제완료된 주문(`409 ORDER_ALREADY_PAID`), 취소된 주문(`409`), 결제 시도 3회 초과 시 서버 거부(`409 PAYMENT_RETRY_LIMIT_EXCEEDED`)
 
 ---
 
