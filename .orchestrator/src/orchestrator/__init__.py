@@ -34,6 +34,14 @@ from .jules_adapter import (
     TransportError,
 )
 
+from .runtime_config import (
+    JulesRuntimeConfig,
+    RuntimeConfigError,
+    get_default_env_file_path,
+    load_jules_api_key,
+    load_jules_runtime_config,
+)
+
 from .result_package import generate_result_package
 
 from .review_handoff import (
@@ -72,6 +80,11 @@ __all__ = [
     "JulesHttpTransport",
     "RealJulesAdapter",
     "TransportError",
+    "JulesRuntimeConfig",
+    "RuntimeConfigError",
+    "get_default_env_file_path",
+    "load_jules_api_key",
+    "load_jules_runtime_config",
     "generate_result_package",
     "CodexNotificationAdapter",
     "execute_review_handoff",

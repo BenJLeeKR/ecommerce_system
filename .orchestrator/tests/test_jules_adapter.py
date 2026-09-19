@@ -4,7 +4,7 @@ import json
 import unittest
 from unittest.mock import MagicMock, patch
 from typing import Any, Dict, Optional, List
-from src.orchestrator.jules_adapter import (
+from orchestrator.jules_adapter import (
     FakeJulesAdapter,
     RealJulesAdapter,
     JulesHttpTransport,

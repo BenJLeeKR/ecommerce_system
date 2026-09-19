@@ -1,8 +1,9 @@
 import unittest
-from src.orchestrator.manual_entrypoint import execute_manual_session_monitor
-from src.orchestrator.status_bridge import BridgeSignal
-from src.orchestrator.jules_adapter import ActivitySummary, TransportError
-from src.orchestrator.session_monitor import ActivityFetcherAdapter
+from unittest.mock import patch
+from orchestrator.manual_entrypoint import execute_manual_session_monitor
+from orchestrator.status_bridge import BridgeSignal
+from orchestrator.jules_adapter import ActivitySummary, TransportError
+from orchestrator.session_monitor import ActivityFetcherAdapter
 
 class FakeAdapter(ActivityFetcherAdapter):
     def __init__(self, activities: ActivitySummary):
@@ -117,6 +118,43 @@ class TestManualEntrypoint(unittest.TestCase):
         self.assertTrue(adapter.fetch_called)
         self.assertEqual(result.status_signal, "READY_FOR_REVIEW")
         self.assertEqual(result.reason_code, "SESSION_COMPLETED")
+
+    @patch("orchestrator.manual_entrypoint.load_jules_api_key")
+    def test_loads_api_key_from_env_when_not_injected(self, mock_load_key):
+        mock_load_key.return_value = self.api_key
+        received_key = None
+
+        def fake_factory(key: str) -> ActivityFetcherAdapter:
+            nonlocal received_key
+            received_key = key
+            return FakeAdapter(self.default_activities)
+
+        result = execute_manual_session_monitor(
+            api_key=None,
+            session_resource_name=self.session_resource_name,
+            is_binding_valid=True,
+            adapter_factory=fake_factory,
+        )
+
+        self.assertEqual(result.status_signal, "READY_FOR_REVIEW")
+        self.assertEqual(received_key, self.api_key)
+        mock_load_key.assert_called_once_with()
+
+    @patch("orchestrator.manual_entrypoint.load_jules_api_key")
+    def test_invalid_env_configuration_is_safely_mapped(self, mock_load_key):
+        from orchestrator.runtime_config import RuntimeConfigError
+
+        mock_load_key.side_effect = RuntimeConfigError("설정 오류")
+
+        result = execute_manual_session_monitor(
+            api_key=None,
+            session_resource_name=self.session_resource_name,
+            is_binding_valid=True,
+            adapter_factory=lambda _: FakeAdapter(self.default_activities),
+        )
+
+        self.assertEqual(result.status_signal, "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(result.reason_code, "RUNTIME_CONFIG_INVALID")
 
 if __name__ == "__main__":
     unittest.main()

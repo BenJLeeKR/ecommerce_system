@@ -1,13 +1,13 @@
 """Codex 검토 대기용 결과 패키지 생성기 단위 테스트."""
 
 import unittest
-from src.orchestrator.models import (
+from orchestrator.models import (
     ExecutionResultInput,
     CodexReviewResultPackage,
     ScopeValidationResult,
 )
-from src.orchestrator.jules_adapter import JulesSessionResponse
-from src.orchestrator.result_package import (
+from orchestrator.jules_adapter import JulesSessionResponse
+from orchestrator.result_package import (
     generate_result_package,
     validate_reason_code_format,
 )

@@ -9,16 +9,17 @@
 """
 
 import logging
-from typing import Callable
+from typing import Callable, Optional
 from .session_monitor import ActivityFetcherAdapter, invoke_session_monitor_once
 from .status_bridge import BridgeSignal
 from .jules_adapter import RealJulesAdapter
+from .runtime_config import RuntimeConfigError, load_jules_api_key
 
 logger = logging.getLogger(__name__)
 
 
 def execute_manual_session_monitor(
-    api_key: str,
+    api_key: Optional[str],
     session_resource_name: str,
     is_binding_valid: bool,
     adapter_factory: Callable[[str], ActivityFetcherAdapter] = lambda key: RealJulesAdapter(api_key=key),
@@ -28,6 +29,7 @@ def execute_manual_session_monitor(
     호출자는 1:1:1 바인딩 유효성을 외부에서 판단하여 `is_binding_valid` 플래그로 전달해야 합니다.
     바인딩이 무효한 경우, 어댑터를 생성하거나 조회 API를 호출하지 않고
     즉시 `NEEDS_HUMAN_REVIEW` 신호를 반환합니다.
+    API 키를 `None`으로 전달하면 `.orchestrator/.env`에서 키만 읽습니다.
 
     Args:
         api_key: 주입할 Jules API 키. (로그나 응답에 노출되지 않도록 엄격히 관리해야 함)
@@ -45,6 +47,15 @@ def execute_manual_session_monitor(
             status_signal="NEEDS_HUMAN_REVIEW",
             reason_code="BINDING_INVALID",
         )
+
+    if api_key is None:
+        try:
+            api_key = load_jules_api_key()
+        except RuntimeConfigError:
+            return BridgeSignal(
+                status_signal="NEEDS_HUMAN_REVIEW",
+                reason_code="RUNTIME_CONFIG_INVALID",
+            )
 
     try:
         adapter = adapter_factory(api_key)

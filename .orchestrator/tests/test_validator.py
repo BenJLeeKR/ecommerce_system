@@ -3,10 +3,10 @@
 import json
 import hashlib
 import unittest
-from src.orchestrator.models import ApprovalEvidence, ApprovalHistoryItem, TaskContract, PathItem
-from src.orchestrator.markdown_parser import parse_task_contract_markdown
-from src.orchestrator.canonicalization import canonicalize_scope, canonicalize_contract, ScopeCanonicalizationError
-from src.orchestrator.validator import (
+from orchestrator.models import ApprovalEvidence, ApprovalHistoryItem, TaskContract, PathItem
+from orchestrator.markdown_parser import parse_task_contract_markdown
+from orchestrator.canonicalization import canonicalize_scope, canonicalize_contract, ScopeCanonicalizationError
+from orchestrator.validator import (
     validate_task_contract,
     validate_approval_id,
     validate_scope_lock_pre_dispatch,

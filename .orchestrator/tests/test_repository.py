@@ -4,7 +4,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
-from src.orchestrator.models import (
+from orchestrator.models import (
     TaskRecord,
     ApprovalEvidence,
     ApprovalHistoryItem,
@@ -12,7 +12,7 @@ from src.orchestrator.models import (
     StateTransition,
     ScopeValidationRecord,
 )
-from src.orchestrator.repository import (
+from orchestrator.repository import (
     StateRepository,
     RepositoryError,
     RepositoryBindingConflictError,
