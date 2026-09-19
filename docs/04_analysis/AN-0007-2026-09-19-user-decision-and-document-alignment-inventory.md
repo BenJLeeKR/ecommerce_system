@@ -1,7 +1,7 @@
 # AN-0007-2026-09-19-user-decision-and-document-alignment-inventory
 
 - 상태: Completed
-- 작성일: 2026-09-19
+- 작성일: 2026-09-19 (KST)
 - 연결 Backlog: 없음
 - 관련 설계: `docs/04_analysis/AN-0005-2026-09-09-design-baseline-consistency-review.md`, `docs/04_analysis/AN-0006-2026-09-10-sensitive-domain-policy-decision-options.md`, `docs/05_worklog/WL-0014-2026-09-10-approved-baseline-alignment.md`, `docs/05_worklog/WL-0019-2026-09-10-sensitive-policy-design-alignment.md`
 
@@ -10,6 +10,7 @@
 | 날짜 | 버전 | 변경 내용 |
 |---|---|---|
 | 2026-09-19 | v1.0 | 사용자 승인 및 미결 사항 인벤토리 정리 및 문서 정합화 후속 PR 분할안 기록 |
+| 2026-09-19 | v1.1 | 화면/UX 미결 항목 보완, 인프라 책임 표기 구체화, DB 정책 반영 경로 포함 및 KST 기준 명시 |
 
 ## 1. 분석 목적 및 배경
 Task Contract `DECISION-ALIGNMENT-INVENTORY-002`에 따라, 현재 프로젝트 기준선(`SHA: 2f131dd1ae79140e5b70db17e3e5bee7bebb034f`) 문서들에 기록된 **사용자 승인 완료 정책**과 **미결(사용자 결정 대기) 항목**을 정밀하게 구분하여 인벤토리화한다.
@@ -44,7 +45,7 @@ Task Contract `DECISION-ALIGNMENT-INVENTORY-002`에 따라, 현재 프로젝트 
 #### C. 승인된 초기 인프라 기준
 - **백업 주기 및 보존**: 매일 03:00 KST 전체 자동 백업, 일간 31개, 월간 12개 보존.
 - **복구 목표**: RPO 24시간, RTO 4시간.
-- **운영 체계**: 프로젝트 전용 DB 생성 후 최초 복구 테스트 수행 및 운영계 승격 전 재검증 대기.
+- **운영 체계 및 책임**: 운영 담당자가 복구 및 장애 대응 책임을 맡으며 별도의 연락망은 두지 않음. 프로젝트 전용 DB 생성 후 최초 복구 테스트 수행 및 운영계 승격 전 재검증 대기.
 
 ---
 
@@ -61,6 +62,9 @@ Task Contract `DECISION-ALIGNMENT-INVENTORY-002`에 따라, 현재 프로젝트 
 | 도메인/기획 | 회원당 기본 배송지 Unique 처리 방식 | 사용자 미결정 상태 보존 |
 | 화면/UX | 장바구니 품절 상품 처리 UX 및 대시보드 통계 기준 | 사용자 미결정 상태 보존 |
 | 화면/UX | 관리자 재고 조정 입력 방식 (증감 vs 절대값) | 사용자 미결정 상태 보존 |
+| 화면/UX | 비밀번호 재설정 모달 또는 별도 화면 분리 여부 | 사용자 미결정 상태 보존 (AN-0005 기준) |
+| 화면/UX | 관리자 회원 상세 화면 신설 여부 | 사용자 미결정 상태 보존 (AN-0005 기준) |
+| 화면/UX | 결제 결과 화면의 폴링 방식 | 사용자 미결정 상태 보존 (AN-0005 기준) |
 
 ---
 
@@ -68,15 +72,15 @@ Task Contract `DECISION-ALIGNMENT-INVENTORY-002`에 따라, 현재 프로젝트 
 
 향후 미결 사항이 승인되거나 후속 정합화 작업이 진행될 때, 단일 PR의 변경 폭을 최소화하고 위험도를 낮추기 위해 다음과 같이 PR을 분할하여 추진하는 안을 권장한다.
 
-1. **후속 PR 1: 인증 및 보안 정책 정합화 (Auth & Security Alignment)**
+1. **후속 PR 1: DB 및 도메인 정책 정합화 (Database & Domain Alignment)**
+   - **대상 범위**: Primary Key 방식(UUID vs BigInt), Enum 처리 방식, 카테고리 삭제 시 소속 상품 처리, 회원 탈퇴 시 주문 제약, 기본 배송지 Unique 규칙 승인 시 반영.
+   - **수정 대상 문서**: `docs/02_design/04_database/database-design.md`, `docs/02_design/04_database/naming-conventions.md`, `docs/02_design/02_domain/domain-model.md`.
+2. **후속 PR 2: 인증 및 보안 정책 정합화 (Auth & Security Alignment)**
    - **대상 범위**: 토큰 만료, 로그인 실패 잠금, Rate Limiting 정책 승인 시 반영.
-   - **수정 문서**: `architecture-overview.md`, `api-list.md`.
-2. **후속 PR 2: 도메인 및 카탈로그 기획 정책 정합화 (Domain & Catalog Alignment)**
-   - **대상 범위**: 카테고리 삭제, 회원 탈퇴 시 주문 제약, 배송지 Unique 규칙 승인 시 반영.
-   - **수정 문서**: `domain-model.md`, `database-design.md`.
+   - **수정 대상 문서**: `docs/02_design/01_architecture/architecture-overview.md`, `docs/02_design/03_api/api-list.md`.
 3. **후속 PR 3: 화면 및 UX 명세 정합화 (UI & Screen Specification Alignment)**
-   - **대상 범위**: 품절 UX, 관리자 재고 입력 방식, 통계 집계 기준 승인 시 반영.
-   - **수정 문서**: `screen-spec.md`, `screen-list.md`.
+   - **대상 범위**: 품절 UX, 관리자 재고 입력 방식, 통계 집계 기준, 비밀번호 재설정 모달/화면 분리, 관리자 회원 상세 화면 신설, 결제 결과 폴링 방식 승인 시 반영.
+   - **수정 대상 문서**: `docs/02_design/05_screen/screen-spec.md`.
 
 ## 5. 결론 및 향후 계획
 - 본 문서를 통해 현재 승인 완료된 8건의 민감 정책, 기술 스택, DB 규약 및 인프라 기준과 미결 항목의 경계를 정밀하게 확립하였다.
