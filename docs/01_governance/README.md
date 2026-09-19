@@ -10,3 +10,5 @@
 - [실행 에이전트 프로필](agent-execution-profiles.md) — Jules·Claude Code의 작업 환경, 권한, 결과물과 선택 기준을 정의한다.
 - [비전문가 검수 가이드 양식](review-guide-template.md) — 기능 검수 기록 양식을 제공한다.
 - [규칙 문서 개정 이력](changelog.md) — 규칙 변경 이력과 개정 원칙을 기록한다.
+- [Orchestrator Project Profile](orchestrator-project-profile.md) — 이커머스 대상 작업의 Orchestrator 통제 경계를 정의한다.
+- [수동 Jules 실행 절차](rules-orchestrated-jules-session.md) — 자동화 불가 시 적용할 승인 기반 수동 폴백 절차를 정의한다.

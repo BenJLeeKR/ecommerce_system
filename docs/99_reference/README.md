@@ -6,3 +6,4 @@
 - [Enterprise Ecommerce AI Backend Guide](Enterprise_ecommerce_AI_Backend_Guide.md) — 엔터프라이즈 이커머스 백엔드 참고 가이드다.
 - [Codex–Jules Thin Orchestrator 실행 계획](codex_jules_thin_orchestrator_execution_plan.md) — Thin Orchestrator의 외부 실행 계획 참고 문서다.
 - [Codex–Jules Thin Orchestrator Action Plan](codex-jules-thin-orchestrator-action-plan.md) — 별도 Orchestrator 프로젝트로 이전된 정본 문서를 안내하기 위한 Superseded 문서이다.
+- [수동 Session Monitor E2E POC 절차](manual-session-monitor-e2e-poc-execution-protocol-v0.1.md) — 실제 E2E 실행 전 참고하는 수동 호출·기록 절차다.
