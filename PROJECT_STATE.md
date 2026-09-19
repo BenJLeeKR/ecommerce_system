@@ -28,7 +28,7 @@
   * 재고 TTL 15분, 결제 재시도 최대 3회 제한, 보상 트랜잭션 등 복잡한 분산 로직 제외. ([AN-0006-2026-09-10-sensitive-domain-policy-decision-options.md](./docs/04_analysis/AN-0006-2026-09-10-sensitive-domain-policy-decision-options.md))
 * **문서 거버넌스:**
   * KST 기준 시각 명시 및 한국어 작성 등 공통 규칙. ([CLAUDE.md](./CLAUDE.md))
-  * 모든 문서는 `docs/` 내 구조를 엄격히 준수. ([document-management-rules.md](./docs/01_governance/document-management-rules.md))
+  * 루트 수준 문서(예: `PROJECT_STATE.md`, `CLAUDE.md` 등)를 제외한 프로젝트 문서는 `docs/` 하위 관리 구조를 엄격히 준수. ([document-management-rules.md](./docs/01_governance/document-management-rules.md))
 
 ## 5. 미결 사항 및 확인 필요 사항
 * **승인 대기 (Codex 권장안):**
