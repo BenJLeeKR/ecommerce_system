@@ -8,3 +8,4 @@
 - [AN-0004](AN-0004-2026-09-09-github-and-jules-guardrails-readiness.md) — GitHub·Jules 보호 설정 적용 전의 현재 상태와 선행 조건을 점검했다.
 - [AN-0005](AN-0005-2026-09-09-design-baseline-consistency-review.md) — 설계 문서 정합성, 기준선, 미결정 사항 및 충돌 요소를 분석했다.
 - [AN-0006](AN-0006-2026-09-10-sensitive-domain-policy-decision-options.md) — 민감 도메인 정책 옵션을 분석하고, 사용자 승인된 정책 및 초기 인프라 기준을 기록했다.
+- [AN-0007](AN-0007-2026-09-19-user-decision-and-document-alignment-inventory.md) — 사용자 승인·미결 결정과 문서 상태를 인벤토리화하고 후속 정합화 PR 분할안을 제시했다.
