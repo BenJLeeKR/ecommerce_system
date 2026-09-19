@@ -6,6 +6,7 @@
 
 - [프로젝트 범위](00_project/project-scope.md) — MVP 범위, 사용자 흐름, 성공 기준을 정의한다.
 - [기술 스택 결정](00_project/tech-stack-decision.md) — 채택 기술과 선택 근거를 정의한다.
+- [결정 레지스터](00_project/decision-register.md) — 승인 완료 결정 사항과 미결 항목을 분리해 추적한다.
 - [거버넌스](01_governance/README.md) — 작업, 품질, 배포, 민감 영역, 문서 관리 규칙을 제공한다.
 
 ## 현재 설계 기준
