@@ -2,6 +2,7 @@
 
 import json
 import re
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -12,8 +13,8 @@ from typing import Any, Dict, List, Optional, Callable
 
 
 REASON_CODE_REGEX = re.compile(r"^[A-Z0-9_]{1,64}$")
-# sources/ 뒤 하나 이상의 안전한 경로 세그먼트(영문자·숫자·_·-)만 허용
-SOURCE_NAME_REGEX = re.compile(r"^sources/([a-zA-Z0-9_\-]+)(/[a-zA-Z0-9_\-]+)*$")
+# Jules 공식 Source Resource Name은 `sources/{source}` 형식의 불투명 식별자다.
+SOURCE_NAME_PREFIX = "sources/"
 
 
 def validate_reason_code(code: Optional[str]) -> bool:
@@ -24,15 +25,25 @@ def validate_reason_code(code: Optional[str]) -> bool:
 
 
 def validate_source_name(source_name: Optional[str]) -> bool:
-    """소스 리소스 이름이 'sources/<id>' 또는 'sources/<segment1>/<segment2>/...' 형식인지 검증합니다.
+    """Jules 공식 `sources/{source}` 리소스 이름의 최소 형식을 검증합니다.
 
-    - sources/ 뒤 하나 이상의 영문, 숫자, _, - 세그먼트 허용
-    - traversal(., ..), 역슬래시, 공백, 빈 세그먼트, 잘못된 접두어 거부
+    Source ID는 API가 발급하는 불투명 식별자이므로 문자 집합이나 하위 경로를
+    임의로 제한하지 않습니다. 실제 연결 여부는 세션 생성 전 Sources API 목록과
+    정확히 대조합니다. 빈 값·잘못된 접두어·공백·제어문자만 거부합니다.
     """
     if not source_name or not isinstance(source_name, str):
         return False
-    return bool(SOURCE_NAME_REGEX.match(source_name))
+    if not source_name.startswith(SOURCE_NAME_PREFIX):
+        return False
 
+    source_id = source_name[len(SOURCE_NAME_PREFIX):]
+    if not source_id:
+        return False
+
+    return not any(
+        character.isspace() or unicodedata.category(character).startswith("C")
+        for character in source_id
+    )
 
 def current_utc_iso8601() -> str:
     """현재 시각을 UTC ISO 8601 형식(시간대 포함)으로 반환합니다."""
@@ -526,37 +537,52 @@ class RealJulesAdapter(JulesAdapter):
         return bool(cls.RESOURCE_NAME_REGEX.match(session_resource_name))
 
     def list_sources(self) -> Dict[str, List[str]]:
-        """GET /sources 연동 (Jules 연결 소스 목록 조회).
+        """GET /sources로 모든 연결 소스를 조회해 최소 정보만 반환합니다.
 
-        원시 데이터 전체가 아닌 세션 생성에 필요한 'sources/<id>' 또는 'sources/<segment1>/<segment2>' 리소스 이름 목록만 추출하여 반환합니다.
+        Source Resource Name·페이지 토큰·원시 응답은 메모리에만 두고 로그나 결과에
+        기록하지 않습니다.
         """
         try:
-            res = self._transport.request(
-                method="GET",
-                path="sources",
-                headers=self._get_headers(),
-            )
-            if not isinstance(res, dict):
-                raise TransportError("INVALID_RESPONSE_FORMAT")
-
-            raw_sources = res.get("sources", [])
             valid_source_names: List[str] = []
+            next_page_token: Optional[str] = None
+            seen_page_tokens = set()
 
-            if isinstance(raw_sources, list):
+            while True:
+                path = "sources?pageSize=100"
+                if next_page_token:
+                    path += "&pageToken=" + urllib.parse.quote(next_page_token, safe="")
+
+                response = self._transport.request(
+                    method="GET",
+                    path=path,
+                    headers=self._get_headers(),
+                )
+                if not isinstance(response, dict):
+                    raise TransportError("INVALID_RESPONSE_FORMAT")
+                raw_sources = response.get("sources", [])
+                if not isinstance(raw_sources, list):
+                    raise TransportError("INVALID_RESPONSE_FORMAT")
+
                 for item in raw_sources:
-                    name = None
-                    if isinstance(item, dict):
-                        name = item.get("name")
-                    elif isinstance(item, str):
-                        name = item
-
-                    if name and validate_source_name(name):
+                    name = item.get("name") if isinstance(item, dict) else item
+                    if isinstance(name, str) and validate_source_name(name):
                         valid_source_names.append(name)
 
-            return {"sources": valid_source_names}
+                raw_next_page_token = response.get("nextPageToken")
+                if raw_next_page_token in (None, ""):
+                    break
+                if (
+                    not isinstance(raw_next_page_token, str)
+                    or raw_next_page_token in seen_page_tokens
+                ):
+                    raise TransportError("INVALID_RESPONSE_FORMAT")
+
+                seen_page_tokens.add(raw_next_page_token)
+                next_page_token = raw_next_page_token
+
+            return {"sources": sorted(set(valid_source_names))}
         except TransportError:
             raise
-
     def create_session(
         self, request: JulesSessionRequest, pre_gate_result: PreGateResult
     ) -> JulesSessionResponse:
@@ -635,7 +661,35 @@ class RealJulesAdapter(JulesAdapter):
                 updated_at_utc=now,
             )
 
-        # 5. HTTP 요청 형성 및 전송
+        # 5. Sources API의 현재 연결 목록과 정확히 대조한다. Source Resource Name은
+        # 메모리에서만 비교하며 응답, 사유 코드, 로그에 기록하지 않는다.
+        try:
+            connected_sources = self.list_sources()["sources"]
+        except TransportError as err:
+            return JulesSessionResponse(
+                session_id="",
+                task_id=request.task_id,
+                branch_name=request.requested_branch,
+                pr_number=None,
+                status="NEEDS_HUMAN_REVIEW",
+                reason_code=err.reason_code,
+                created_at_utc=now,
+                updated_at_utc=now,
+            )
+
+        if request.source_name not in connected_sources:
+            return JulesSessionResponse(
+                session_id="",
+                task_id=request.task_id,
+                branch_name=request.requested_branch,
+                pr_number=None,
+                status="NEEDS_HUMAN_REVIEW",
+                reason_code="SOURCE_NOT_CONNECTED",
+                created_at_utc=now,
+                updated_at_utc=now,
+            )
+
+        # 6. HTTP 요청 형성 및 전송
         body = {
             "prompt": request.prompt or "",
             "sourceContext": {
@@ -667,7 +721,7 @@ class RealJulesAdapter(JulesAdapter):
                 updated_at_utc=now,
             )
 
-        # 6. 구조화 응답 검증 및 추출
+        # 7. 구조화 응답 검증 및 추출
         if not isinstance(resp_data, dict):
             return JulesSessionResponse(
                 session_id="",

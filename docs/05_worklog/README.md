@@ -25,3 +25,4 @@
 - [WL-0021](WL-0021-2026-09-10-orchestrator-poc-checklist.md) — Thin Orchestrator Action Plan을 Superseded 문서로 전환하고 POC 수행 기록을 남겼다.
 - [WL-0022](WL-0022-2026-09-19-thin-orchestrator-initial-import.md) — Thin Orchestrator 초기 이식과 런타임 설정 로더 추가 작업을 기록했다.
 - [WL-0023](WL-0023-2026-09-19-orchestrator-document-reconciliation.md) — 하위 Orchestrator 문서를 루트 체계로 이관하고 규칙 충돌을 정합화했다.
+- [WL-0024](WL-0024-2026-09-19-jules-source-validation-alignment.md) — Jules Source Resource Name 검증을 공식 API 기준과 연결 소스 목록 대조 방식으로 정합화했다.

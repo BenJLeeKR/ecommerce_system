@@ -24,6 +24,7 @@ class MockJulesHttpTransport(JulesHttpTransport):
     def __init__(self) -> None:
         self.requests: List[Dict[str, Any]] = []
         self.response_to_return: Optional[Dict[str, Any]] = None
+        self.response_queue: List[Dict[str, Any]] = []
         self.error_to_raise: Optional[TransportError] = None
 
     def request(
@@ -43,6 +44,8 @@ class MockJulesHttpTransport(JulesHttpTransport):
         })
         if self.error_to_raise:
             raise self.error_to_raise
+        if self.response_queue:
+            return self.response_queue.pop(0)
         return self.response_to_return if self.response_to_return is not None else {}
 
 
@@ -110,12 +113,13 @@ class TestValidateSourceName(unittest.TestCase):
     """validate_source_name 다중 세그먼트 및 거부 조건 검증 테스트."""
 
     def test_valid_single_and_multi_segment_sources(self) -> None:
-        """단일 세그먼트 및 공식 GitHub 다중 세그먼트 sources 허용 검증."""
+        """공식 Source Resource Name의 불투명 식별자와 하위 경로를 허용한다."""
         valid_cases = [
             "sources/default",
             "sources/src-123",
             "sources/github/test-owner/test-repository",
             "sources/github/owner-name/repo_name-123",
+            "sources/github.example/owner/repository.v2",
             "sources/a/b/c/d/e",
         ]
         for src in valid_cases:
@@ -123,16 +127,10 @@ class TestValidateSourceName(unittest.TestCase):
                 self.assertTrue(validate_source_name(src))
 
     def test_invalid_source_names_rejected(self) -> None:
-        """traversal, 역슬래시, 공백, 제어문자, 빈 세그먼트, 잘못된 접두어 거부 검증."""
+        """빈 값, 잘못된 접두어, 공백과 제어문자를 거부한다."""
         invalid_cases = [
-            "sources/..",
-            "sources/../secret",
-            "sources/./a",
-            "sources/a/../b",
-            "sources/github\\owner\\repo",
             "sources/github/owner /repo",
             "sources/github/owner\n/repo",
-            "sources//repo",
             "sources/",
             "sources",
             "invalid_prefix/a/b",
@@ -198,7 +196,7 @@ class TestFakeJulesAdapter(unittest.TestCase):
 
     def test_invalid_source_name_fails(self) -> None:
         """source_name 누락, 빈값, 잘못된 포맷 시 INVALID_SOURCE_NAME 거부 검증."""
-        bad_sources = ["", "  ", "default", "invalid_prefix/123", "sources/..", None]
+        bad_sources = ["", "  ", "default", "invalid_prefix/123", "sources/", None]
         for bad_src in bad_sources:
             with self.subTest(source_name=bad_src):
                 req = JulesSessionRequest(
@@ -443,26 +441,37 @@ class TestRealJulesAdapter(unittest.TestCase):
         self.assertEqual(len(self.mock_transport.requests), 1)
         req = self.mock_transport.requests[0]
         self.assertEqual(req["method"], "GET")
-        self.assertEqual(req["path"], "sources")
+        self.assertEqual(req["path"], "sources?pageSize=100")
         self.assertEqual(req["headers"]["X-Goog-Api-Key"], self.api_key)
 
         # 원시 메타데이터가 제외되고 sources 리소스 이름만 추출됨 확인
         self.assertEqual(sources, {"sources": ["sources/github/test-owner/test-repository", "sources/src-my-repo-002"]})
 
+    def test_list_sources_rejects_non_object_response(self) -> None:
+        """Sources API의 비객체 응답은 원문 없이 구조화 오류로 처리한다."""
+        self.mock_transport.response_to_return = []  # type: ignore[assignment]
+
+        with self.assertRaises(TransportError) as context:
+            self.adapter.list_sources()
+
+        self.assertEqual(context.exception.reason_code, "INVALID_RESPONSE_FORMAT")
+
     def test_create_session_request_body_and_source_injection(self) -> None:
         """POST /sessions 세션 생성 요청 바디 형성 및 source_name 주입 검증."""
-        self.mock_transport.response_to_return = {
-            "name": "sessions/ses-real-001",
-            "state": "CREATED",
-        }
+        self.mock_transport.response_queue = [
+            {"sources": [self.valid_request.source_name]},
+            {"name": "sessions/ses-real-001", "state": "CREATED"},
+        ]
 
         resp = self.adapter.create_session(self.valid_request, self.valid_pre_gate)
 
         self.assertEqual(resp.status, "CREATED")
         self.assertEqual(resp.session_id, "sessions/ses-real-001")
-        self.assertEqual(len(self.mock_transport.requests), 1)
+        self.assertEqual(len(self.mock_transport.requests), 2)
+        self.assertEqual(self.mock_transport.requests[0]["method"], "GET")
+        self.assertEqual(self.mock_transport.requests[0]["path"], "sources?pageSize=100")
 
-        req = self.mock_transport.requests[0]
+        req = self.mock_transport.requests[1]
         self.assertEqual(req["method"], "POST")
         self.assertEqual(req["path"], "sessions")
         self.assertEqual(req["headers"]["X-Goog-Api-Key"], self.api_key)
@@ -475,8 +484,8 @@ class TestRealJulesAdapter(unittest.TestCase):
         self.assertTrue(body["requirePlanApproval"])
 
     def test_create_session_invalid_source_name_rejection(self) -> None:
-        """sources/default 등 하드코딩이나 빈값/잘못된 포맷의 source_name 전달 시 INVALID_SOURCE_NAME 거부."""
-        bad_sources = ["", "  ", "default", "sources/", "invalid_prefix/123", "sources/..", "sources/a\\b", None]
+        """빈값·잘못된 접두어·공백이 포함된 source_name은 목록 조회 전에 거부한다."""
+        bad_sources = ["", "  ", "default", "sources/", "invalid_prefix/123", "sources/a b", None]
         for bad_src in bad_sources:
             with self.subTest(source_name=bad_src):
                 req = JulesSessionRequest(
@@ -490,6 +499,35 @@ class TestRealJulesAdapter(unittest.TestCase):
                 res = self.adapter.create_session(req, self.valid_pre_gate)
                 self.assertEqual(res.status, "NEEDS_HUMAN_REVIEW")
                 self.assertEqual(res.reason_code, "INVALID_SOURCE_NAME")
+
+
+    def test_create_session_rejects_source_not_in_connected_source_list(self) -> None:
+        """문법상 유효해도 현재 연결된 Source 목록에 없으면 POST 전에 중단한다."""
+        self.mock_transport.response_to_return = {"sources": ["sources/github/other/repository"]}
+
+        response = self.adapter.create_session(self.valid_request, self.valid_pre_gate)
+
+        self.assertEqual(response.status, "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(response.reason_code, "SOURCE_NOT_CONNECTED")
+        self.assertEqual(len(self.mock_transport.requests), 1)
+        self.assertEqual(self.mock_transport.requests[0]["method"], "GET")
+
+    def test_list_sources_reads_all_pages_without_exposing_page_tokens(self) -> None:
+        """모든 목록 페이지를 합산하고 페이지 토큰은 결과에 보존하지 않는다."""
+        self.mock_transport.response_queue = [
+            {"sources": ["sources/github.example/owner/repository.v2"], "nextPageToken": "opaque-token"},
+            {"sources": ["sources/github/owner/repository"]},
+        ]
+
+        sources = self.adapter.list_sources()
+
+        self.assertEqual(
+            sources,
+            {"sources": ["sources/github.example/owner/repository.v2", "sources/github/owner/repository"]},
+        )
+        self.assertEqual(len(self.mock_transport.requests), 2)
+        self.assertEqual(self.mock_transport.requests[0]["path"], "sources?pageSize=100")
+        self.assertTrue(self.mock_transport.requests[1]["path"].startswith("sources?pageSize=100&pageToken="))
 
     def test_get_activities_returns_official_union_summary_without_raw_payloads(self) -> None:
         """GET /sessions/{id}/activities 연동시 공식 Activity union 필드 존재 여부로만 요약되며 원시 민감 패이로드가 절대 남지 않음을 검증."""
