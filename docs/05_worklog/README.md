@@ -25,3 +25,4 @@
 - [WL-0021](WL-0021-2026-09-10-orchestrator-poc-checklist.md) — Thin Orchestrator Action Plan을 Superseded 문서로 전환하고 POC 수행 기록을 남겼다.
 - [WL-0022](WL-0022-2026-09-19-thin-orchestrator-initial-import.md) — Thin Orchestrator 초기 이식과 런타임 설정 로더 추가 작업을 기록했다.
 - [WL-0023](WL-0023-2026-09-19-orchestrator-document-reconciliation.md) — 하위 Orchestrator 문서를 루트 체계로 이관하고 규칙 충돌을 정합화했다.
+- [WL-0024](WL-0024-2026-09-19-user-decision-inventory.md) — 사용자 승인 완료 정책 및 미결 사항 인벤토리 작성과 후속 PR 분할안 기록 작업을 정리했다.
