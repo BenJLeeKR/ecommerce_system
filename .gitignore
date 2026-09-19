@@ -32,6 +32,11 @@ htmlcov/
 .coverage
 coverage/
 
+
+# --- 혹시 생길 수 있는 런타임 DB 방어
+*.sqlite
+*.db
+
 # --- Build ---
 dist/
 build/
