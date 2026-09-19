@@ -25,6 +25,8 @@ env/
 .cursor/
 
 # --- Testing ---
+*.pyc
+__pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -46,5 +48,20 @@ build/
 .DS_Store
 Thumbs.db
 .aider*
+reorganize_docs.sh
 node_modules/
 postgres_data/
+
+# --- Runtime write paths ---
+docker-compose.yml.bak
+logs/
+tmp/
+data/runtime/
+data/cache/
+data/local/
+data/instrument_master/archive/
+data/observations/
+data/signal_feature_snapshot_input.json
+data/signal_feature_snapshot_input_*.json
+data/trigger_proxy_attribution_*.json
+data/ar_fdc_*.json
