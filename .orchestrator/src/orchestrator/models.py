@@ -205,6 +205,29 @@ class ExecutionResultInput:
 
 
 @dataclass
+class PersistentSessionBinding:
+    """Jules 세션과 실제 Git 브랜치, PR 번호를 1:1:1로 영속 결속하는 데이터 모델."""
+    task_id: str
+    session_id: str
+    branch_name: str
+    pr_number: int
+    contract_hash: str
+    approved_scope_hash: str
+    recorded_at_utc: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "task_id": self.task_id,
+            "session_id": self.session_id,
+            "branch_name": self.branch_name,
+            "pr_number": self.pr_number,
+            "contract_hash": self.contract_hash,
+            "approved_scope_hash": self.approved_scope_hash,
+            "recorded_at_utc": self.recorded_at_utc,
+        }
+
+
+@dataclass
 class CodexReviewResultPackage:
     """Codex 검토 대기용 구조화 결과 패키지 데이터 모델.
 

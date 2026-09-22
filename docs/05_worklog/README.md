@@ -28,3 +28,4 @@
 - [WL-0024](WL-0024-2026-09-19-user-decision-inventory.md) — 사용자 승인 완료 정책 및 미결 사항 인벤토리 작성과 후속 PR 분할안 기록 작업을 정리했다.
 - [WL-0025](WL-0025-2026-09-19-decision-register-foundation.md) — 결정 레지스터 초안 작성 및 문서 지도 반영 작업을 정리했다.
 - [WL-0026](WL-0026-2026-09-22-jules-main-start-branch-guard.md) — Jules 세션 main 시작 및 예상 브랜치 사후 결속 정책을 어댑터와 거버넌스에 반영했다.
+- [WL-0027](WL-0027-2026-09-22-persistent-session-binding.md) — Jules 세션 ID, 브랜치명, PR 번호를 SQLite DB에 영속 결속하여 1:1:1 중복 및 불일치를 차단하는 모델을 추가했다.

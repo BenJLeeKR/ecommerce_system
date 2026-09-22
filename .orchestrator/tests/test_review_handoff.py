@@ -15,6 +15,9 @@ from orchestrator.review_handoff import (
     CodexNotificationAdapter,
     execute_review_handoff,
 )
+from orchestrator.repository import StateRepository
+import tempfile
+from pathlib import Path
 
 
 class MockCodexAdapter(CodexNotificationAdapter):
@@ -97,6 +100,44 @@ class TestReviewHandoff(unittest.TestCase):
         )
 
         self.codex_adapter = MockCodexAdapter()
+
+    def test_successful_review_handoff_with_binding_save(self):
+        # 성공 시 PersistentSessionBinding이 저장되는지 검증
+        jules_adapter = MockJulesAdapter(self.valid_session, self.completed_activities)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "test_state.db"
+            repository = StateRepository(db_path)
+
+            changed_files = ["src/main.py", "src/utils.py"]
+
+            transition = execute_review_handoff(
+                task_id=self.task_id,
+                session_id=self.session_id,
+                branch_name=self.branch_name,
+                pr_identifier=self.pr_identifier,
+                changed_files=changed_files,
+                allowed_paths=self.allowed_paths,
+                forbidden_paths=self.forbidden_paths,
+                expected_contract_hash=self.contract_hash,
+                expected_approved_scope_hash=self.approved_scope_hash,
+                expected_idempotency_key=self.idempotency_key,
+                expected_approval_id=self.approval_id,
+                transition_agent=self.transition_agent,
+                jules_adapter=jules_adapter,
+                codex_adapter=self.codex_adapter,
+                repository=repository,
+                verified_session=self.valid_session,
+            )
+
+            self.assertEqual(transition.to_status, "REVIEW_READY_DETECTED")
+            self.assertEqual(len(self.codex_adapter.notified_packages), 1)
+
+            # 영속 저장소 확인
+            binding = repository.get_persistent_session_binding(self.session_id)
+            self.assertIsNotNone(binding)
+            self.assertEqual(binding.branch_name, self.branch_name)
+            self.assertEqual(binding.pr_number, 42)
 
     def test_successful_review_handoff(self):
         jules_adapter = MockJulesAdapter(self.valid_session, self.completed_activities)
@@ -347,6 +388,135 @@ class TestReviewHandoff(unittest.TestCase):
         self.assertEqual(transition.to_status, "NEEDS_HUMAN_REVIEW")
         self.assertIn("PR_BINDING_MISMATCH", transition.reason)
         self.assertEqual(len(self.codex_adapter.notified_packages), 0)
+
+    def test_binding_conflict_aborts_handoff(self):
+        """저장소 저장 중 BINDING_CONFLICT 발생 시 무알림/무저장 및 NEEDS_HUMAN_REVIEW 전이 검증."""
+        jules_adapter = MockJulesAdapter(self.valid_session, self.completed_activities)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "test_state.db"
+            repository = StateRepository(db_path)
+
+            # 먼저 상충되는 정보를 저장해둠
+            from orchestrator.models import PersistentSessionBinding
+            conflict_binding = PersistentSessionBinding(
+                task_id=self.task_id,
+                session_id="sess_different", # 다른 세션
+                branch_name=self.branch_name, # 브랜치명 중복 유발
+                pr_number=99,
+                contract_hash=self.contract_hash,
+                approved_scope_hash=self.approved_scope_hash,
+                recorded_at_utc="2026-09-17T00:00:00Z"
+            )
+            repository.save_persistent_session_binding(conflict_binding)
+
+            changed_files = ["src/main.py"]
+
+            transition = execute_review_handoff(
+                task_id=self.task_id,
+                session_id=self.session_id,
+                branch_name=self.branch_name,
+                pr_identifier=self.pr_identifier,
+                changed_files=changed_files,
+                allowed_paths=self.allowed_paths,
+                forbidden_paths=self.forbidden_paths,
+                expected_contract_hash=self.contract_hash,
+                expected_approved_scope_hash=self.approved_scope_hash,
+                expected_idempotency_key=self.idempotency_key,
+                expected_approval_id=self.approval_id,
+                transition_agent=self.transition_agent,
+                jules_adapter=jules_adapter,
+                codex_adapter=self.codex_adapter,
+                repository=repository,
+                verified_session=self.valid_session,
+            )
+
+            self.assertEqual(transition.to_status, "NEEDS_HUMAN_REVIEW")
+            self.assertEqual(transition.reason, "BINDING_CONFLICT")
+            self.assertEqual(len(self.codex_adapter.notified_packages), 0)
+
+            # 새 세션 정보가 저장되지 않았는지 확인
+            binding = repository.get_persistent_session_binding(self.session_id)
+            self.assertIsNone(binding)
+
+    def test_scope_validation_failure_with_repository(self):
+        """Scope 실패 시 repository 주입 상황에서 DB에 영속 결속이 저장되지 않고 알림 없이 진행됨을 검증."""
+        jules_adapter = MockJulesAdapter(self.valid_session, self.completed_activities)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "test_state.db"
+            repository = StateRepository(db_path)
+
+            # 금지 경로인 docs/ 수정 시도
+            changed_files = ["src/main.py", "docs/readme.md"]
+
+            transition = execute_review_handoff(
+                task_id=self.task_id,
+                session_id=self.session_id,
+                branch_name=self.branch_name,
+                pr_identifier=self.pr_identifier,
+                changed_files=changed_files,
+                allowed_paths=self.allowed_paths,
+                forbidden_paths=self.forbidden_paths,
+                expected_contract_hash=self.contract_hash,
+                expected_approved_scope_hash=self.approved_scope_hash,
+                expected_idempotency_key=self.idempotency_key,
+                expected_approval_id=self.approval_id,
+                transition_agent=self.transition_agent,
+                jules_adapter=jules_adapter,
+                codex_adapter=self.codex_adapter,
+                repository=repository,
+                verified_session=self.valid_session,
+            )
+
+            self.assertEqual(transition.to_status, "NEEDS_HUMAN_REVIEW")
+            self.assertIn("SCOPE_VALIDATION_FAILED", transition.reason)
+            self.assertEqual(len(self.codex_adapter.notified_packages), 0)
+
+            # 영속 결속이 저장되지 않았는지 확인
+            binding = repository.get_persistent_session_binding(self.session_id)
+            self.assertIsNone(binding)
+
+    def test_general_exception_aborts_handoff(self):
+        """일반적인 Exception 발생 시 원시 오류 노출 없이 무알림/무저장, BINDING_SAVE_ERROR 전이 검증."""
+        jules_adapter = MockJulesAdapter(self.valid_session, self.completed_activities)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "test_state.db"
+            repository = StateRepository(db_path)
+
+            # 강제로 에러를 발생시키는 Mock Repository
+            class ErrorRepository(StateRepository):
+                def save_persistent_session_binding(self, binding):
+                    raise Exception("Some unexpected raw database error")
+
+            error_repo = ErrorRepository(db_path)
+
+            changed_files = ["src/main.py"]
+
+            transition = execute_review_handoff(
+                task_id=self.task_id,
+                session_id=self.session_id,
+                branch_name=self.branch_name,
+                pr_identifier=self.pr_identifier,
+                changed_files=changed_files,
+                allowed_paths=self.allowed_paths,
+                forbidden_paths=self.forbidden_paths,
+                expected_contract_hash=self.contract_hash,
+                expected_approved_scope_hash=self.approved_scope_hash,
+                expected_idempotency_key=self.idempotency_key,
+                expected_approval_id=self.approval_id,
+                transition_agent=self.transition_agent,
+                jules_adapter=jules_adapter,
+                codex_adapter=self.codex_adapter,
+                repository=error_repo,
+                verified_session=self.valid_session,
+            )
+
+            self.assertEqual(transition.to_status, "NEEDS_HUMAN_REVIEW")
+            # 원시 에러 문자열이 노출되지 않고, 지정된 사유 코드를 반환하는지 확인
+            self.assertEqual(transition.reason, "BINDING_SAVE_ERROR")
+            self.assertEqual(len(self.codex_adapter.notified_packages), 0)
 
 if __name__ == "__main__":
     unittest.main()

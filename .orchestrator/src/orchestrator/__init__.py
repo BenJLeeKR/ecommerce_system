@@ -13,6 +13,7 @@ from .models import (
     ValidationResult,
     ExecutionResultInput,
     CodexReviewResultPackage,
+    PersistentSessionBinding,
 )
 
 from .markdown_parser import parse_task_contract_markdown
@@ -64,6 +65,7 @@ __all__ = [
     "ValidationResult",
     "ExecutionResultInput",
     "CodexReviewResultPackage",
+    "PersistentSessionBinding",
     "parse_task_contract_markdown",
     "canonicalize_contract",
     "canonicalize_scope",
