@@ -12,3 +12,4 @@
 - [규칙 문서 개정 이력](changelog.md) — 규칙 변경 이력과 개정 원칙을 기록한다.
 - [Orchestrator Project Profile](orchestrator-project-profile.md) — 이커머스 대상 작업의 Orchestrator 통제 경계를 정의한다.
 - [수동 Jules 실행 절차](rules-orchestrated-jules-session.md) — 자동화 불가 시 적용할 승인 기반 수동 폴백 절차를 정의한다.
+- [Orchestrator Runtime DB 운영 기준](orchestrator-runtime-db-operations.md) — Orchestrator Runtime SQLite DB의 저장 원칙, 접근 권한, 백업·복구 기준을 정의한다.
