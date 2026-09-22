@@ -27,3 +27,4 @@
 - [WL-0023](WL-0023-2026-09-19-orchestrator-document-reconciliation.md) — 하위 Orchestrator 문서를 루트 체계로 이관하고 규칙 충돌을 정합화했다.
 - [WL-0024](WL-0024-2026-09-19-user-decision-inventory.md) — 사용자 승인 완료 정책 및 미결 사항 인벤토리 작성과 후속 PR 분할안 기록 작업을 정리했다.
 - [WL-0025](WL-0025-2026-09-19-decision-register-foundation.md) — 결정 레지스터 초안 작성 및 문서 지도 반영 작업을 정리했다.
+- [WL-0026](WL-0026-2026-09-22-jules-main-start-branch-guard.md) — Jules 세션 main 시작 및 예상 브랜치 사후 결속 정책을 어댑터와 거버넌스에 반영했다.

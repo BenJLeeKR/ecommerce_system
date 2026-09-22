@@ -2,6 +2,7 @@
 
 import json
 import re
+import subprocess
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -37,6 +38,16 @@ def validate_source_name(source_name: Optional[str]) -> bool:
 def current_utc_iso8601() -> str:
     """현재 시각을 UTC ISO 8601 형식(시간대 포함)으로 반환합니다."""
     return datetime.now(timezone.utc).isoformat()
+
+
+def default_remote_main_sha_fn() -> Optional[str]:
+    """원격 origin/main을 갱신하고 현재 SHA를 반환합니다."""
+    try:
+        subprocess.run(["git", "fetch", "origin", "main"], check=True, capture_output=True)
+        res = subprocess.run(["git", "rev-parse", "origin/main"], check=True, capture_output=True, text=True)
+        return res.stdout.strip()
+    except Exception:
+        return None
 
 
 @dataclass
@@ -86,7 +97,7 @@ class JulesSessionRequest:
     contract_hash: str
     approved_scope_hash: str
     idempotency_key: str
-    requested_branch: str
+    base_sha: str
     source_name: str  # 형식: 'sources/<id>' 또는 'sources/github/<owner>/<repo>' (명시적 주입 필수)
     prompt: Optional[str] = field(default="", repr=False)
 
@@ -96,7 +107,7 @@ class JulesSessionResponse:
     """Jules 세션 응답 데이터 모델."""
     session_id: str
     task_id: str
-    branch_name: str
+    branch_name: Optional[str]
     pr_number: Optional[int]
     status: str  # e.g., 'CREATED', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED', 'NEEDS_HUMAN_REVIEW'
     reason_code: Optional[str]
@@ -140,8 +151,8 @@ class JulesAdapter(ABC):
         pass
 
     @abstractmethod
-    def update_session_pr(self, session_id: str, pr_number: int) -> JulesSessionResponse:
-        """세션에 PR 번호를 바인딩합니다."""
+    def bind_session_outputs(self, session_id: str, branch_name: str, pr_number: int) -> JulesSessionResponse:
+        """세션에 Jules가 생성한 실제 작업 브랜치와 PR 번호를 사후 결속합니다."""
         pass
 
     @abstractmethod
@@ -166,7 +177,11 @@ class FakeJulesAdapter(JulesAdapter):
     `clock_fn`을 주입받아 완전한 시간 결정론성을 보장할 수 있습니다.
     """
 
-    def __init__(self, clock_fn: Optional[Callable[[], str]] = None) -> None:
+    def __init__(
+        self,
+        clock_fn: Optional[Callable[[], str]] = None,
+        remote_main_sha_fn: Optional[Callable[[], Optional[str]]] = None
+    ) -> None:
         self._sessions: Dict[str, JulesSessionResponse] = {}
         # 1:1:1 바인딩 인덱스
         self._branch_to_session: Dict[str, str] = {}
@@ -174,6 +189,7 @@ class FakeJulesAdapter(JulesAdapter):
         self._task_to_session: Dict[str, str] = {}
         self._session_counter = 0
         self._clock_fn = clock_fn or current_utc_iso8601
+        self._remote_main_sha_fn = remote_main_sha_fn or default_remote_main_sha_fn
 
     def _now(self) -> str:
         return self._clock_fn()
@@ -182,6 +198,20 @@ class FakeJulesAdapter(JulesAdapter):
         self, request: JulesSessionRequest, pre_gate_result: PreGateResult
     ) -> JulesSessionResponse:
         now = self._now()
+
+        # 0. 원격 origin/main 대조 및 SHA 확인
+        actual_sha = self._remote_main_sha_fn()
+        if not actual_sha or actual_sha != request.base_sha:
+            return JulesSessionResponse(
+                session_id="",
+                task_id=request.task_id,
+                branch_name=None,
+                pr_number=None,
+                status="NEEDS_HUMAN_REVIEW",
+                reason_code="BASE_SHA_MISMATCH",
+                created_at_utc=now,
+                updated_at_utc=now,
+            )
 
         # 1. 사전 게이트 검증 (is_valid=True, is_session_creation_authorized=True, status="APPROVED" 요구)
         if (
@@ -192,7 +222,7 @@ class FakeJulesAdapter(JulesAdapter):
             return JulesSessionResponse(
                 session_id="",
                 task_id=request.task_id,
-                branch_name=request.requested_branch,
+                branch_name=None,
                 pr_number=None,
                 status="NEEDS_HUMAN_REVIEW",
                 reason_code="PREGATE_VALIDATION_FAILED",
@@ -210,7 +240,7 @@ class FakeJulesAdapter(JulesAdapter):
             return JulesSessionResponse(
                 session_id="",
                 task_id=request.task_id,
-                branch_name=request.requested_branch,
+                branch_name=None,
                 pr_number=None,
                 status="NEEDS_HUMAN_REVIEW",
                 reason_code="BINDING_MISMATCH",
@@ -223,7 +253,7 @@ class FakeJulesAdapter(JulesAdapter):
             return JulesSessionResponse(
                 session_id="",
                 task_id=request.task_id,
-                branch_name=request.requested_branch,
+                branch_name=None,
                 pr_number=None,
                 status="NEEDS_HUMAN_REVIEW",
                 reason_code="INVALID_SOURCE_NAME",
@@ -232,25 +262,12 @@ class FakeJulesAdapter(JulesAdapter):
             )
 
         # 4. 1:1:1 바인딩 중복 및 상충 검사
-        if request.requested_branch in self._branch_to_session:
-            existing_sid = self._branch_to_session[request.requested_branch]
-            return JulesSessionResponse(
-                session_id=existing_sid,
-                task_id=request.task_id,
-                branch_name=request.requested_branch,
-                pr_number=None,
-                status="NEEDS_HUMAN_REVIEW",
-                reason_code="DUPLICATE_BINDING_CONFLICT",
-                created_at_utc=now,
-                updated_at_utc=now,
-            )
-
         if request.task_id in self._task_to_session:
             existing_sid = self._task_to_session[request.task_id]
             return JulesSessionResponse(
                 session_id=existing_sid,
                 task_id=request.task_id,
-                branch_name=request.requested_branch,
+                branch_name=None,
                 pr_number=None,
                 status="NEEDS_HUMAN_REVIEW",
                 reason_code="DUPLICATE_BINDING_CONFLICT",
@@ -265,7 +282,7 @@ class FakeJulesAdapter(JulesAdapter):
         response = JulesSessionResponse(
             session_id=session_id,
             task_id=request.task_id,
-            branch_name=request.requested_branch,
+            branch_name=None,
             pr_number=None,
             status="CREATED",
             reason_code=None,
@@ -274,7 +291,6 @@ class FakeJulesAdapter(JulesAdapter):
         )
 
         self._sessions[session_id] = response
-        self._branch_to_session[request.requested_branch] = session_id
         self._task_to_session[request.task_id] = session_id
 
         return response
@@ -294,14 +310,14 @@ class FakeJulesAdapter(JulesAdapter):
             )
         return self._sessions[session_id]
 
-    def update_session_pr(self, session_id: str, pr_number: int) -> JulesSessionResponse:
+    def bind_session_outputs(self, session_id: str, branch_name: str, pr_number: int) -> JulesSessionResponse:
         now = self._now()
         if session_id not in self._sessions:
             return JulesSessionResponse(
                 session_id=session_id,
                 task_id="",
-                branch_name="",
-                pr_number=pr_number,
+                branch_name=None,
+                pr_number=None,
                 status="NEEDS_HUMAN_REVIEW",
                 reason_code="SESSION_NOT_FOUND",
                 created_at_utc=now,
@@ -317,15 +333,30 @@ class FakeJulesAdapter(JulesAdapter):
             session.updated_at_utc = now
             return session
 
+        # Branch 1:1 바인딩 검증
+        if branch_name in self._branch_to_session and self._branch_to_session[branch_name] != session_id:
+            session.status = "NEEDS_HUMAN_REVIEW"
+            session.reason_code = "DUPLICATE_BINDING_CONFLICT"
+            session.updated_at_utc = now
+            return session
+
         if session.pr_number is not None and session.pr_number != pr_number:
             session.status = "NEEDS_HUMAN_REVIEW"
             session.reason_code = "BINDING_MISMATCH"
             session.updated_at_utc = now
             return session
 
+        if session.branch_name is not None and session.branch_name != branch_name:
+            session.status = "NEEDS_HUMAN_REVIEW"
+            session.reason_code = "BINDING_MISMATCH"
+            session.updated_at_utc = now
+            return session
+
+        session.branch_name = branch_name
         session.pr_number = pr_number
         session.updated_at_utc = now
         self._pr_to_session[pr_number] = session_id
+        self._branch_to_session[branch_name] = session_id
         return session
 
     def transition_session_status(
@@ -336,7 +367,7 @@ class FakeJulesAdapter(JulesAdapter):
             return JulesSessionResponse(
                 session_id=session_id,
                 task_id="",
-                branch_name="",
+                branch_name=None,
                 pr_number=None,
                 status="NEEDS_HUMAN_REVIEW",
                 reason_code="SESSION_NOT_FOUND",
@@ -493,6 +524,7 @@ class RealJulesAdapter(JulesAdapter):
         api_key: str,
         transport: Optional[JulesHttpTransport] = None,
         clock_fn: Optional[Callable[[], str]] = None,
+        remote_main_sha_fn: Optional[Callable[[], Optional[str]]] = None,
         base_url: str = "https://jules.googleapis.com/v1alpha",
     ) -> None:
         if not api_key or not isinstance(api_key, str) or not api_key.strip():
@@ -500,6 +532,7 @@ class RealJulesAdapter(JulesAdapter):
         self._api_key = api_key.strip()
         self._transport = transport or UrllibJulesHttpTransport(base_url=base_url)
         self._clock_fn = clock_fn or current_utc_iso8601
+        self._remote_main_sha_fn = remote_main_sha_fn or default_remote_main_sha_fn
         self._sessions: Dict[str, JulesSessionResponse] = {}
         # 1:1:1 바인딩 인덱스 (로컬)
         self._branch_to_session: Dict[str, str] = {}
@@ -562,6 +595,20 @@ class RealJulesAdapter(JulesAdapter):
     ) -> JulesSessionResponse:
         now = self._now()
 
+        # 0. 원격 origin/main 대조 및 SHA 확인
+        actual_sha = self._remote_main_sha_fn()
+        if not actual_sha or actual_sha != request.base_sha:
+            return JulesSessionResponse(
+                session_id="",
+                task_id=request.task_id,
+                branch_name=None,
+                pr_number=None,
+                status="NEEDS_HUMAN_REVIEW",
+                reason_code="BASE_SHA_MISMATCH",
+                created_at_utc=now,
+                updated_at_utc=now,
+            )
+
         # 1. 사전 게이트 검증
         if (
             not pre_gate_result.is_valid
@@ -571,7 +618,7 @@ class RealJulesAdapter(JulesAdapter):
             return JulesSessionResponse(
                 session_id="",
                 task_id=request.task_id,
-                branch_name=request.requested_branch,
+                branch_name=None,
                 pr_number=None,
                 status="NEEDS_HUMAN_REVIEW",
                 reason_code="PREGATE_VALIDATION_FAILED",
@@ -589,7 +636,7 @@ class RealJulesAdapter(JulesAdapter):
             return JulesSessionResponse(
                 session_id="",
                 task_id=request.task_id,
-                branch_name=request.requested_branch,
+                branch_name=None,
                 pr_number=None,
                 status="NEEDS_HUMAN_REVIEW",
                 reason_code="BINDING_MISMATCH",
@@ -602,7 +649,7 @@ class RealJulesAdapter(JulesAdapter):
             return JulesSessionResponse(
                 session_id="",
                 task_id=request.task_id,
-                branch_name=request.requested_branch,
+                branch_name=None,
                 pr_number=None,
                 status="NEEDS_HUMAN_REVIEW",
                 reason_code="INVALID_SOURCE_NAME",
@@ -611,23 +658,11 @@ class RealJulesAdapter(JulesAdapter):
             )
 
         # 4. 1:1:1 로컬 바인딩 중복/상충 검증
-        if request.requested_branch in self._branch_to_session:
-            return JulesSessionResponse(
-                session_id=self._branch_to_session[request.requested_branch],
-                task_id=request.task_id,
-                branch_name=request.requested_branch,
-                pr_number=None,
-                status="NEEDS_HUMAN_REVIEW",
-                reason_code="DUPLICATE_BINDING_CONFLICT",
-                created_at_utc=now,
-                updated_at_utc=now,
-            )
-
         if request.task_id in self._task_to_session:
             return JulesSessionResponse(
                 session_id=self._task_to_session[request.task_id],
                 task_id=request.task_id,
-                branch_name=request.requested_branch,
+                branch_name=None,
                 pr_number=None,
                 status="NEEDS_HUMAN_REVIEW",
                 reason_code="DUPLICATE_BINDING_CONFLICT",
@@ -641,7 +676,7 @@ class RealJulesAdapter(JulesAdapter):
             "sourceContext": {
                 "source": request.source_name,
                 "githubRepoContext": {
-                    "startingBranch": request.requested_branch,
+                    "startingBranch": "main",
                 },
             },
             "automationMode": "AUTO_CREATE_PR",
@@ -659,7 +694,7 @@ class RealJulesAdapter(JulesAdapter):
             return JulesSessionResponse(
                 session_id="",
                 task_id=request.task_id,
-                branch_name=request.requested_branch,
+                branch_name=None,
                 pr_number=None,
                 status="NEEDS_HUMAN_REVIEW",
                 reason_code=err.reason_code,
@@ -672,7 +707,7 @@ class RealJulesAdapter(JulesAdapter):
             return JulesSessionResponse(
                 session_id="",
                 task_id=request.task_id,
-                branch_name=request.requested_branch,
+                branch_name=None,
                 pr_number=None,
                 status="NEEDS_HUMAN_REVIEW",
                 reason_code="INVALID_RESPONSE_FORMAT",
@@ -685,7 +720,7 @@ class RealJulesAdapter(JulesAdapter):
             return JulesSessionResponse(
                 session_id="",
                 task_id=request.task_id,
-                branch_name=request.requested_branch,
+                branch_name=None,
                 pr_number=None,
                 status="NEEDS_HUMAN_REVIEW",
                 reason_code="INVALID_RESPONSE_FORMAT",
@@ -699,7 +734,7 @@ class RealJulesAdapter(JulesAdapter):
             return JulesSessionResponse(
                 session_id="",
                 task_id=request.task_id,
-                branch_name=request.requested_branch,
+                branch_name=None,
                 pr_number=None,
                 status="NEEDS_HUMAN_REVIEW",
                 reason_code="INVALID_RESPONSE_FORMAT",
@@ -710,7 +745,7 @@ class RealJulesAdapter(JulesAdapter):
         response = JulesSessionResponse(
             session_id=session_resource_name,
             task_id=request.task_id,
-            branch_name=request.requested_branch,
+            branch_name=None,
             pr_number=None,
             status="CREATED",
             reason_code=None,
@@ -719,7 +754,6 @@ class RealJulesAdapter(JulesAdapter):
         )
 
         self._sessions[session_resource_name] = response
-        self._branch_to_session[request.requested_branch] = session_resource_name
         self._task_to_session[request.task_id] = session_resource_name
 
         return response
@@ -864,7 +898,7 @@ class RealJulesAdapter(JulesAdapter):
             return JulesSessionResponse(
                 session_id=session_id,
                 task_id="",
-                branch_name="",
+                branch_name=None,
                 pr_number=None,
                 status="NEEDS_HUMAN_REVIEW",
                 reason_code="SESSION_NOT_FOUND",
@@ -875,7 +909,7 @@ class RealJulesAdapter(JulesAdapter):
         return JulesSessionResponse(
             session_id=session_id,
             task_id="",
-            branch_name="",
+            branch_name=None,
             pr_number=None,
             status="NEEDS_HUMAN_REVIEW",
             reason_code="SESSION_NOT_FOUND",
@@ -883,14 +917,14 @@ class RealJulesAdapter(JulesAdapter):
             updated_at_utc=now,
         )
 
-    def update_session_pr(self, session_id: str, pr_number: int) -> JulesSessionResponse:
+    def bind_session_outputs(self, session_id: str, branch_name: str, pr_number: int) -> JulesSessionResponse:
         now = self._now()
         if session_id not in self._sessions:
             return JulesSessionResponse(
                 session_id=session_id,
                 task_id="",
-                branch_name="",
-                pr_number=pr_number,
+                branch_name=None,
+                pr_number=None,
                 status="NEEDS_HUMAN_REVIEW",
                 reason_code="SESSION_NOT_FOUND",
                 created_at_utc=now,
@@ -899,7 +933,15 @@ class RealJulesAdapter(JulesAdapter):
 
         session = self._sessions[session_id]
 
+        # PR 1:1 바인딩 검증
         if pr_number in self._pr_to_session and self._pr_to_session[pr_number] != session_id:
+            session.status = "NEEDS_HUMAN_REVIEW"
+            session.reason_code = "DUPLICATE_BINDING_CONFLICT"
+            session.updated_at_utc = now
+            return session
+
+        # Branch 1:1 바인딩 검증
+        if branch_name in self._branch_to_session and self._branch_to_session[branch_name] != session_id:
             session.status = "NEEDS_HUMAN_REVIEW"
             session.reason_code = "DUPLICATE_BINDING_CONFLICT"
             session.updated_at_utc = now
@@ -911,9 +953,17 @@ class RealJulesAdapter(JulesAdapter):
             session.updated_at_utc = now
             return session
 
+        if session.branch_name is not None and session.branch_name != branch_name:
+            session.status = "NEEDS_HUMAN_REVIEW"
+            session.reason_code = "BINDING_MISMATCH"
+            session.updated_at_utc = now
+            return session
+
+        session.branch_name = branch_name
         session.pr_number = pr_number
         session.updated_at_utc = now
         self._pr_to_session[pr_number] = session_id
+        self._branch_to_session[branch_name] = session_id
         return session
 
     def transition_session_status(
@@ -924,7 +974,7 @@ class RealJulesAdapter(JulesAdapter):
             return JulesSessionResponse(
                 session_id=session_id,
                 task_id="",
-                branch_name="",
+                branch_name=None,
                 pr_number=None,
                 status="NEEDS_HUMAN_REVIEW",
                 reason_code="SESSION_NOT_FOUND",
@@ -974,7 +1024,7 @@ class RealJulesAdapter(JulesAdapter):
         return JulesSessionResponse(
             session_id=session_id,
             task_id="",
-            branch_name="",
+            branch_name=None,
             pr_number=None,
             status="NEEDS_HUMAN_REVIEW",
             reason_code="REMOTE_CANCEL_UNSUPPORTED",
