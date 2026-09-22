@@ -1,7 +1,7 @@
 # BL-0005: Orchestrator Runtime DB 실제 운영 기준 확립 및 이관
 
 - **상태**: 제안됨 (Proposed)
-- **우선순위**: P0
+- **우선순위**: P1
 - **등록일**: 2026-09-22 (KST)
 - **관련 문서**: [Orchestrator Runtime DB 운영 기준](../01_governance/orchestrator-runtime-db-operations.md)
 
