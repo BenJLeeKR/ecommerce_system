@@ -47,23 +47,26 @@ class MockJulesHttpTransport(JulesHttpTransport):
 
 
 class TestJulesSessionRequestPromptMasking(unittest.TestCase):
-    """JulesSessionRequest 프롬프트 repr 차단 검증 테스트."""
+    """JulesSessionRequest 프롬프트 및 source_name repr 차단 검증 테스트."""
 
-    def test_prompt_excluded_from_repr(self) -> None:
-        """repr(JulesSessionRequest) 실행 시 프롬프트 원문이 포함되지 않음을 검증."""
+    def test_prompt_and_source_name_excluded_from_repr(self) -> None:
+        """repr(JulesSessionRequest) 실행 시 프롬프트와 source_name 원문이 포함되지 않음을 검증."""
         secret_prompt = "비밀_프롬프트_원문_12345_SECRET"
+        secret_source = "sources/github/owner/secret-repo"
         req = JulesSessionRequest(
             task_id="TEST-TASK-001",
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
             approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
             base_sha="7f782c0a6ab295bb9db4d45971dc0d74c7e247e9",
-            source_name="sources/github/owner/repo",
+            source_name=secret_source,
             prompt=secret_prompt,
         )
         repr_str = repr(req)
         self.assertNotIn(secret_prompt, repr_str)
+        self.assertNotIn(secret_source, repr_str)
         self.assertEqual(req.prompt, secret_prompt)  # 데이터 속성은 정상 유지
+        self.assertEqual(req.source_name, secret_source)
 
 
 class TestUrllibJulesHttpTransport(unittest.TestCase):
@@ -164,6 +167,7 @@ class TestFakeJulesAdapter(unittest.TestCase):
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
             approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
+            base_sha=self.base_sha,
         )
         self.valid_request = JulesSessionRequest(
             task_id="TEST-TASK-001",
@@ -229,6 +233,7 @@ class TestFakeJulesAdapter(unittest.TestCase):
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
             approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
+            base_sha=self.base_sha,
         )
         res = self.adapter.create_session(self.valid_request, medium_pre_gate)
         self.assertEqual(res.status, "CREATED")
@@ -247,6 +252,7 @@ class TestFakeJulesAdapter(unittest.TestCase):
                     contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
                     approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
                     idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
+                    base_sha=self.base_sha,
                 )
                 res = self.adapter.create_session(self.valid_request, pre_gate)
                 self.assertEqual(res.status, "NEEDS_HUMAN_REVIEW")
@@ -263,6 +269,7 @@ class TestFakeJulesAdapter(unittest.TestCase):
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
             approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
+            base_sha=self.base_sha,
         )
         res = self.adapter.create_session(self.valid_request, unauthorized_pre_gate)
         self.assertEqual(res.status, "NEEDS_HUMAN_REVIEW")
@@ -307,6 +314,7 @@ class TestFakeJulesAdapter(unittest.TestCase):
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
             approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
+            base_sha=self.base_sha,
         )
         res = self.adapter.create_session(self.valid_request, invalid_pre_gate)
         self.assertEqual(res.status, "NEEDS_HUMAN_REVIEW")
@@ -323,7 +331,19 @@ class TestFakeJulesAdapter(unittest.TestCase):
             base_sha="badbadbadbadbadbadbadbadbadbadbadbadbadb",
             source_name="sources/github/owner/repo",
         )
-        res = self.adapter.create_session(bad_request, self.valid_pre_gate)
+        # Contract의 SHA도 요청과 같게 맞춤 (그래야 Contract 불일치가 아닌 원격 불일치로 통과)
+        bad_pre_gate = PreGateResult(
+            is_valid=True,
+            is_dispatch_eligible=True,
+            is_session_creation_authorized=True,
+            status="APPROVED",
+            task_id="TEST-TASK-001",
+            contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
+            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
+            base_sha="badbadbadbadbadbadbadbadbadbadbadbadbadb",
+        )
+        res = self.adapter.create_session(bad_request, bad_pre_gate)
         self.assertEqual(res.status, "NEEDS_HUMAN_REVIEW")
         self.assertEqual(res.reason_code, "BASE_SHA_MISMATCH")
 
@@ -364,6 +384,7 @@ class TestFakeJulesAdapter(unittest.TestCase):
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
             approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
+            base_sha=self.base_sha,
         )
         res2 = self.adapter.create_session(dup_request, dup_pre_gate)
         self.assertEqual(res2.status, "NEEDS_HUMAN_REVIEW")
@@ -391,6 +412,7 @@ class TestFakeJulesAdapter(unittest.TestCase):
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
             approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
             idempotency_key="idem-v1:4444444444444444444444444444444444444444444444444444444444444444",
+            base_sha=self.base_sha,
         )
         res2 = self.adapter.create_session(req2, pg2)
 
@@ -444,6 +466,7 @@ class TestRealJulesAdapter(unittest.TestCase):
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
             approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
+            base_sha=self.base_sha,
         )
         self.valid_request = JulesSessionRequest(
             task_id="REAL-TASK-001",
@@ -506,6 +529,51 @@ class TestRealJulesAdapter(unittest.TestCase):
         self.assertEqual(body["sourceContext"]["githubRepoContext"]["startingBranch"], "main")
         self.assertEqual(body["automationMode"], "AUTO_CREATE_PR")
         self.assertTrue(body["requirePlanApproval"])
+
+    def test_base_sha_mismatch_prevents_api_call(self) -> None:
+        """원격 SHA 불일치 시 HTTP 호출 없이 NEEDS_HUMAN_REVIEW 반환 검증."""
+        bad_request = JulesSessionRequest(
+            task_id="REAL-TASK-001",
+            contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
+            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
+            base_sha="badbadbadbadbadbadbadbadbadbadbadbadbadb",
+            source_name="sources/github/test-owner/test-repository",
+        )
+        # Contract의 SHA도 요청과 같게 맞춤 (그래야 Contract 불일치가 아닌 원격 불일치로 통과)
+        bad_pre_gate = PreGateResult(
+            is_valid=True,
+            is_dispatch_eligible=False,
+            is_session_creation_authorized=True,
+            status="APPROVED",
+            task_id="REAL-TASK-001",
+            contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
+            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
+            base_sha="badbadbadbadbadbadbadbadbadbadbadbadbadb",
+        )
+        res = self.adapter.create_session(bad_request, bad_pre_gate)
+        self.assertEqual(res.status, "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(res.reason_code, "BASE_SHA_MISMATCH")
+        self.assertEqual(len(self.mock_transport.requests), 0)
+
+    def test_contract_base_sha_mismatch_prevents_api_call(self) -> None:
+        """요청 SHA가 원격과 같더라도 사전 게이트(Contract) SHA와 다르면 HTTP 호출 없이 NEEDS_HUMAN_REVIEW 반환 검증."""
+        mismatched_pre_gate = PreGateResult(
+            is_valid=True,
+            is_dispatch_eligible=False,
+            is_session_creation_authorized=True,
+            status="APPROVED",
+            task_id="REAL-TASK-001",
+            contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
+            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
+            base_sha="different_approved_sha_from_contract_123",
+        )
+        res = self.adapter.create_session(self.valid_request, mismatched_pre_gate)
+        self.assertEqual(res.status, "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(res.reason_code, "BINDING_MISMATCH")
+        self.assertEqual(len(self.mock_transport.requests), 0)
 
     def test_create_session_invalid_source_name_rejection(self) -> None:
         """sources/default 등 하드코딩이나 빈값/잘못된 포맷의 source_name 전달 시 INVALID_SOURCE_NAME 거부."""

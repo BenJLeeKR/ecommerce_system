@@ -88,6 +88,7 @@ class PreGateResult:
     contract_hash: str
     approved_scope_hash: str
     idempotency_key: str
+    base_sha: str
 
 
 @dataclass
@@ -98,7 +99,7 @@ class JulesSessionRequest:
     approved_scope_hash: str
     idempotency_key: str
     base_sha: str
-    source_name: str  # 형식: 'sources/<id>' 또는 'sources/github/<owner>/<repo>' (명시적 주입 필수)
+    source_name: str = field(repr=False) # 형식: 'sources/<id>' 또는 'sources/github/<owner>/<repo>' (명시적 주입 필수)
     prompt: Optional[str] = field(default="", repr=False)
 
 
@@ -199,20 +200,6 @@ class FakeJulesAdapter(JulesAdapter):
     ) -> JulesSessionResponse:
         now = self._now()
 
-        # 0. 원격 origin/main 대조 및 SHA 확인
-        actual_sha = self._remote_main_sha_fn()
-        if not actual_sha or actual_sha != request.base_sha:
-            return JulesSessionResponse(
-                session_id="",
-                task_id=request.task_id,
-                branch_name=None,
-                pr_number=None,
-                status="NEEDS_HUMAN_REVIEW",
-                reason_code="BASE_SHA_MISMATCH",
-                created_at_utc=now,
-                updated_at_utc=now,
-            )
-
         # 1. 사전 게이트 검증 (is_valid=True, is_session_creation_authorized=True, status="APPROVED" 요구)
         if (
             not pre_gate_result.is_valid
@@ -230,12 +217,13 @@ class FakeJulesAdapter(JulesAdapter):
                 updated_at_utc=now,
             )
 
-        # 2. 실행 바인딩 일치 검증
+        # 2. 실행 바인딩 및 Contract 기준 SHA 일치 검증
         if (
             request.task_id != pre_gate_result.task_id
             or request.contract_hash != pre_gate_result.contract_hash
             or request.approved_scope_hash != pre_gate_result.approved_scope_hash
             or request.idempotency_key != pre_gate_result.idempotency_key
+            or request.base_sha != pre_gate_result.base_sha
         ):
             return JulesSessionResponse(
                 session_id="",
@@ -244,6 +232,20 @@ class FakeJulesAdapter(JulesAdapter):
                 pr_number=None,
                 status="NEEDS_HUMAN_REVIEW",
                 reason_code="BINDING_MISMATCH",
+                created_at_utc=now,
+                updated_at_utc=now,
+            )
+
+        # 3. 원격 origin/main 대조 및 SHA 확인
+        actual_sha = self._remote_main_sha_fn()
+        if not actual_sha or actual_sha != request.base_sha:
+            return JulesSessionResponse(
+                session_id="",
+                task_id=request.task_id,
+                branch_name=None,
+                pr_number=None,
+                status="NEEDS_HUMAN_REVIEW",
+                reason_code="BASE_SHA_MISMATCH",
                 created_at_utc=now,
                 updated_at_utc=now,
             )
@@ -595,20 +597,6 @@ class RealJulesAdapter(JulesAdapter):
     ) -> JulesSessionResponse:
         now = self._now()
 
-        # 0. 원격 origin/main 대조 및 SHA 확인
-        actual_sha = self._remote_main_sha_fn()
-        if not actual_sha or actual_sha != request.base_sha:
-            return JulesSessionResponse(
-                session_id="",
-                task_id=request.task_id,
-                branch_name=None,
-                pr_number=None,
-                status="NEEDS_HUMAN_REVIEW",
-                reason_code="BASE_SHA_MISMATCH",
-                created_at_utc=now,
-                updated_at_utc=now,
-            )
-
         # 1. 사전 게이트 검증
         if (
             not pre_gate_result.is_valid
@@ -626,12 +614,13 @@ class RealJulesAdapter(JulesAdapter):
                 updated_at_utc=now,
             )
 
-        # 2. 실행 바인딩 일치 검증
+        # 2. 실행 바인딩 및 Contract 기준 SHA 일치 검증
         if (
             request.task_id != pre_gate_result.task_id
             or request.contract_hash != pre_gate_result.contract_hash
             or request.approved_scope_hash != pre_gate_result.approved_scope_hash
             or request.idempotency_key != pre_gate_result.idempotency_key
+            or request.base_sha != pre_gate_result.base_sha
         ):
             return JulesSessionResponse(
                 session_id="",
@@ -640,6 +629,20 @@ class RealJulesAdapter(JulesAdapter):
                 pr_number=None,
                 status="NEEDS_HUMAN_REVIEW",
                 reason_code="BINDING_MISMATCH",
+                created_at_utc=now,
+                updated_at_utc=now,
+            )
+
+        # 3. 원격 origin/main 대조 및 SHA 확인
+        actual_sha = self._remote_main_sha_fn()
+        if not actual_sha or actual_sha != request.base_sha:
+            return JulesSessionResponse(
+                session_id="",
+                task_id=request.task_id,
+                branch_name=None,
+                pr_number=None,
+                status="NEEDS_HUMAN_REVIEW",
+                reason_code="BASE_SHA_MISMATCH",
                 created_at_utc=now,
                 updated_at_utc=now,
             )
