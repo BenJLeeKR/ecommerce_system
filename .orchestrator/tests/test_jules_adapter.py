@@ -47,23 +47,26 @@ class MockJulesHttpTransport(JulesHttpTransport):
 
 
 class TestJulesSessionRequestPromptMasking(unittest.TestCase):
-    """JulesSessionRequest 프롬프트 repr 차단 검증 테스트."""
+    """JulesSessionRequest 프롬프트 및 source_name repr 차단 검증 테스트."""
 
-    def test_prompt_excluded_from_repr(self) -> None:
-        """repr(JulesSessionRequest) 실행 시 프롬프트 원문이 포함되지 않음을 검증."""
+    def test_prompt_and_source_name_excluded_from_repr(self) -> None:
+        """repr(JulesSessionRequest) 실행 시 프롬프트와 source_name 원문이 포함되지 않음을 검증."""
         secret_prompt = "비밀_프롬프트_원문_12345_SECRET"
+        secret_source = "sources/github/owner/secret-repo"
         req = JulesSessionRequest(
             task_id="TEST-TASK-001",
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
             approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
-            requested_branch="feat/test",
-            source_name="sources/github/owner/repo",
+            base_sha="7f782c0a6ab295bb9db4d45971dc0d74c7e247e9",
+            source_name=secret_source,
             prompt=secret_prompt,
         )
         repr_str = repr(req)
         self.assertNotIn(secret_prompt, repr_str)
+        self.assertNotIn(secret_source, repr_str)
         self.assertEqual(req.prompt, secret_prompt)  # 데이터 속성은 정상 유지
+        self.assertEqual(req.source_name, secret_source)
 
 
 class TestUrllibJulesHttpTransport(unittest.TestCase):
@@ -150,7 +153,11 @@ class TestFakeJulesAdapter(unittest.TestCase):
 
     def setUp(self) -> None:
         self.fixed_timestamp = "2026-09-17T12:00:00.000000+00:00"
-        self.adapter = FakeJulesAdapter(clock_fn=lambda: self.fixed_timestamp)
+        self.base_sha = "7f782c0a6ab295bb9db4d45971dc0d74c7e247e9"
+        self.adapter = FakeJulesAdapter(
+            clock_fn=lambda: self.fixed_timestamp,
+            remote_main_sha_fn=lambda: self.base_sha
+        )
         self.valid_pre_gate = PreGateResult(
             is_valid=True,
             is_dispatch_eligible=True,
@@ -160,13 +167,14 @@ class TestFakeJulesAdapter(unittest.TestCase):
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
             approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
+            base_sha=self.base_sha,
         )
         self.valid_request = JulesSessionRequest(
             task_id="TEST-TASK-001",
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
             approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
-            requested_branch="feature/test-branch-1",
+            base_sha=self.base_sha,
             source_name="sources/github/test-owner/test-repository",
             prompt="테스트 프롬프트",
         )
@@ -178,16 +186,17 @@ class TestFakeJulesAdapter(unittest.TestCase):
         self.assertTrue(res.session_id.startswith("SES-TEST-TASK-001-"))
         self.assertIsNone(res.reason_code)
         self.assertEqual(res.task_id, "TEST-TASK-001")
-        self.assertEqual(res.branch_name, "feature/test-branch-1")
+        self.assertIsNone(res.branch_name) # 초기엔 None
         self.assertEqual(res.created_at_utc, self.fixed_timestamp)
 
         # RUNNING 상태 전이
         running_res = self.adapter.transition_session_status(res.session_id, "RUNNING")
         self.assertEqual(running_res.status, "RUNNING")
 
-        # PR 바인딩
-        pr_res = self.adapter.update_session_pr(res.session_id, 101)
-        self.assertEqual(pr_res.pr_number, 101)
+        # 브랜치 및 PR 사후 바인딩
+        bind_res = self.adapter.bind_session_outputs(res.session_id, "feat/real-work", 101)
+        self.assertEqual(bind_res.branch_name, "feat/real-work")
+        self.assertEqual(bind_res.pr_number, 101)
 
         # COMPLETED 상태 전이
         completed_res = self.adapter.transition_session_status(
@@ -206,7 +215,7 @@ class TestFakeJulesAdapter(unittest.TestCase):
                     contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
                     approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
                     idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
-                    requested_branch="feature/test-branch-1",
+                    base_sha=self.base_sha,
                     source_name=bad_src,
                 )
                 res = self.adapter.create_session(req, self.valid_pre_gate)
@@ -224,6 +233,7 @@ class TestFakeJulesAdapter(unittest.TestCase):
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
             approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
+            base_sha=self.base_sha,
         )
         res = self.adapter.create_session(self.valid_request, medium_pre_gate)
         self.assertEqual(res.status, "CREATED")
@@ -242,6 +252,7 @@ class TestFakeJulesAdapter(unittest.TestCase):
                     contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
                     approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
                     idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
+                    base_sha=self.base_sha,
                 )
                 res = self.adapter.create_session(self.valid_request, pre_gate)
                 self.assertEqual(res.status, "NEEDS_HUMAN_REVIEW")
@@ -258,6 +269,7 @@ class TestFakeJulesAdapter(unittest.TestCase):
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
             approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
+            base_sha=self.base_sha,
         )
         res = self.adapter.create_session(self.valid_request, unauthorized_pre_gate)
         self.assertEqual(res.status, "NEEDS_HUMAN_REVIEW")
@@ -265,8 +277,14 @@ class TestFakeJulesAdapter(unittest.TestCase):
 
     def test_determinism_with_fixed_clock(self) -> None:
         """동일 입력 및 초기 상태에서 타임스탬프를 포함한 세션 생성 응답이 완전 결정론적인지 검증."""
-        adapter1 = FakeJulesAdapter(clock_fn=lambda: "2026-09-17T12:00:00.000000+00:00")
-        adapter2 = FakeJulesAdapter(clock_fn=lambda: "2026-09-17T12:00:00.000000+00:00")
+        adapter1 = FakeJulesAdapter(
+            clock_fn=lambda: "2026-09-17T12:00:00.000000+00:00",
+            remote_main_sha_fn=lambda: self.base_sha
+        )
+        adapter2 = FakeJulesAdapter(
+            clock_fn=lambda: "2026-09-17T12:00:00.000000+00:00",
+            remote_main_sha_fn=lambda: self.base_sha
+        )
 
         res1 = adapter1.create_session(self.valid_request, self.valid_pre_gate)
         res2 = adapter2.create_session(self.valid_request, self.valid_pre_gate)
@@ -296,11 +314,38 @@ class TestFakeJulesAdapter(unittest.TestCase):
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
             approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
+            base_sha=self.base_sha,
         )
         res = self.adapter.create_session(self.valid_request, invalid_pre_gate)
         self.assertEqual(res.status, "NEEDS_HUMAN_REVIEW")
         self.assertEqual(res.reason_code, "PREGATE_VALIDATION_FAILED")
         self.assertEqual(res.session_id, "")
+
+    def test_base_sha_mismatch(self) -> None:
+        """요청 base_sha와 원격 main SHA 불일치 시 NEEDS_HUMAN_REVIEW (API 호출 방지)."""
+        bad_request = JulesSessionRequest(
+            task_id="TEST-TASK-001",
+            contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
+            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
+            base_sha="badbadbadbadbadbadbadbadbadbadbadbadbadb",
+            source_name="sources/github/owner/repo",
+        )
+        # Contract의 SHA도 요청과 같게 맞춤 (그래야 Contract 불일치가 아닌 원격 불일치로 통과)
+        bad_pre_gate = PreGateResult(
+            is_valid=True,
+            is_dispatch_eligible=True,
+            is_session_creation_authorized=True,
+            status="APPROVED",
+            task_id="TEST-TASK-001",
+            contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
+            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
+            base_sha="badbadbadbadbadbadbadbadbadbadbadbadbadb",
+        )
+        res = self.adapter.create_session(bad_request, bad_pre_gate)
+        self.assertEqual(res.status, "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(res.reason_code, "BASE_SHA_MISMATCH")
 
     def test_binding_mismatch_handling(self) -> None:
         """요청 바인딩과 사전 게이트 바인딩 불일치 시 NEEDS_HUMAN_REVIEW 처리 테스트."""
@@ -309,7 +354,7 @@ class TestFakeJulesAdapter(unittest.TestCase):
             contract_hash="9999999999999999999999999999999999999999999999999999999999999999",
             approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
-            requested_branch="feature/test-branch-1",
+            base_sha=self.base_sha,
             source_name="sources/src-test-001",
         )
         res = self.adapter.create_session(mismatched_request, self.valid_pre_gate)
@@ -318,16 +363,16 @@ class TestFakeJulesAdapter(unittest.TestCase):
         self.assertEqual(res.session_id, "")
 
     def test_duplicate_branch_or_task_binding_conflict(self) -> None:
-        """동일 브랜치 또는 Task ID에 대한 중복 세션 생성 거부 및 바인딩 상충 테스트."""
+        """동일 Task ID에 대한 중복 세션 생성 거부 (이제 Branch는 사후 결속) 테스트."""
         res1 = self.adapter.create_session(self.valid_request, self.valid_pre_gate)
         self.assertEqual(res1.status, "CREATED")
 
         dup_request = JulesSessionRequest(
-            task_id="TEST-TASK-002",
+            task_id="TEST-TASK-001",
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
             approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
-            idempotency_key="idem-v1:4444444444444444444444444444444444444444444444444444444444444444",
-            requested_branch="feature/test-branch-1",
+            idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
+            base_sha=self.base_sha,
             source_name="sources/src-test-001",
         )
         dup_pre_gate = PreGateResult(
@@ -335,26 +380,27 @@ class TestFakeJulesAdapter(unittest.TestCase):
             is_dispatch_eligible=True,
             is_session_creation_authorized=True,
             status="APPROVED",
-            task_id="TEST-TASK-002",
+            task_id="TEST-TASK-001",
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
             approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
-            idempotency_key="idem-v1:4444444444444444444444444444444444444444444444444444444444444444",
+            idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
+            base_sha=self.base_sha,
         )
         res2 = self.adapter.create_session(dup_request, dup_pre_gate)
         self.assertEqual(res2.status, "NEEDS_HUMAN_REVIEW")
         self.assertEqual(res2.reason_code, "DUPLICATE_BINDING_CONFLICT")
 
-    def test_duplicate_pr_number_conflict(self) -> None:
-        """동일한 PR 번호를 다른 세션에 중복 바인딩 시도 시 상충 거부 테스트."""
+    def test_duplicate_binding_conflict_on_outputs(self) -> None:
+        """동일한 PR 번호 또는 Branch를 다른 세션에 중복 바인딩 시도 시 상충 거부 테스트."""
         res1 = self.adapter.create_session(self.valid_request, self.valid_pre_gate)
-        self.adapter.update_session_pr(res1.session_id, 100)
+        self.adapter.bind_session_outputs(res1.session_id, "feat/branch-1", 100)
 
         req2 = JulesSessionRequest(
             task_id="TEST-TASK-002",
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
             approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
             idempotency_key="idem-v1:4444444444444444444444444444444444444444444444444444444444444444",
-            requested_branch="feature/test-branch-2",
+            base_sha=self.base_sha,
             source_name="sources/src-test-001",
         )
         pg2 = PreGateResult(
@@ -366,12 +412,19 @@ class TestFakeJulesAdapter(unittest.TestCase):
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
             approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
             idempotency_key="idem-v1:4444444444444444444444444444444444444444444444444444444444444444",
+            base_sha=self.base_sha,
         )
         res2 = self.adapter.create_session(req2, pg2)
 
-        pr_res2 = self.adapter.update_session_pr(res2.session_id, 100)
-        self.assertEqual(pr_res2.status, "NEEDS_HUMAN_REVIEW")
-        self.assertEqual(pr_res2.reason_code, "DUPLICATE_BINDING_CONFLICT")
+        # PR 충돌
+        bind_res2_pr = self.adapter.bind_session_outputs(res2.session_id, "feat/branch-2", 100)
+        self.assertEqual(bind_res2_pr.status, "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(bind_res2_pr.reason_code, "DUPLICATE_BINDING_CONFLICT")
+
+        # 브랜치 충돌
+        bind_res2_br = self.adapter.bind_session_outputs(res2.session_id, "feat/branch-1", 101)
+        self.assertEqual(bind_res2_br.status, "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(bind_res2_br.reason_code, "DUPLICATE_BINDING_CONFLICT")
 
     def test_reason_code_validation(self) -> None:
         """구조화 사유 코드 형식 검증 및 거부 테스트."""
@@ -397,10 +450,12 @@ class TestRealJulesAdapter(unittest.TestCase):
         self.api_key = "test-secret-api-key-12345"
         self.mock_transport = MockJulesHttpTransport()
         self.fixed_timestamp = "2026-09-18T10:00:00.000000+00:00"
+        self.base_sha = "7f782c0a6ab295bb9db4d45971dc0d74c7e247e9"
         self.adapter = RealJulesAdapter(
             api_key=self.api_key,
             transport=self.mock_transport,
             clock_fn=lambda: self.fixed_timestamp,
+            remote_main_sha_fn=lambda: self.base_sha
         )
         self.valid_pre_gate = PreGateResult(
             is_valid=True,
@@ -411,13 +466,14 @@ class TestRealJulesAdapter(unittest.TestCase):
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
             approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
+            base_sha=self.base_sha,
         )
         self.valid_request = JulesSessionRequest(
             task_id="REAL-TASK-001",
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
             approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
-            requested_branch="feat/real-api-branch-1",
+            base_sha=self.base_sha,
             source_name="sources/github/test-owner/test-repository",
             prompt="실제 어댑터 테스트 프롬프트",
         )
@@ -470,9 +526,54 @@ class TestRealJulesAdapter(unittest.TestCase):
         body = req["body"]
         self.assertEqual(body["prompt"], "실제 어댑터 테스트 프롬프트")
         self.assertEqual(body["sourceContext"]["source"], "sources/github/test-owner/test-repository")
-        self.assertEqual(body["sourceContext"]["githubRepoContext"]["startingBranch"], "feat/real-api-branch-1")
+        self.assertEqual(body["sourceContext"]["githubRepoContext"]["startingBranch"], "main")
         self.assertEqual(body["automationMode"], "AUTO_CREATE_PR")
         self.assertTrue(body["requirePlanApproval"])
+
+    def test_base_sha_mismatch_prevents_api_call(self) -> None:
+        """원격 SHA 불일치 시 HTTP 호출 없이 NEEDS_HUMAN_REVIEW 반환 검증."""
+        bad_request = JulesSessionRequest(
+            task_id="REAL-TASK-001",
+            contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
+            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
+            base_sha="badbadbadbadbadbadbadbadbadbadbadbadbadb",
+            source_name="sources/github/test-owner/test-repository",
+        )
+        # Contract의 SHA도 요청과 같게 맞춤 (그래야 Contract 불일치가 아닌 원격 불일치로 통과)
+        bad_pre_gate = PreGateResult(
+            is_valid=True,
+            is_dispatch_eligible=False,
+            is_session_creation_authorized=True,
+            status="APPROVED",
+            task_id="REAL-TASK-001",
+            contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
+            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
+            base_sha="badbadbadbadbadbadbadbadbadbadbadbadbadb",
+        )
+        res = self.adapter.create_session(bad_request, bad_pre_gate)
+        self.assertEqual(res.status, "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(res.reason_code, "BASE_SHA_MISMATCH")
+        self.assertEqual(len(self.mock_transport.requests), 0)
+
+    def test_contract_base_sha_mismatch_prevents_api_call(self) -> None:
+        """요청 SHA가 원격과 같더라도 사전 게이트(Contract) SHA와 다르면 HTTP 호출 없이 NEEDS_HUMAN_REVIEW 반환 검증."""
+        mismatched_pre_gate = PreGateResult(
+            is_valid=True,
+            is_dispatch_eligible=False,
+            is_session_creation_authorized=True,
+            status="APPROVED",
+            task_id="REAL-TASK-001",
+            contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
+            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
+            base_sha="different_approved_sha_from_contract_123",
+        )
+        res = self.adapter.create_session(self.valid_request, mismatched_pre_gate)
+        self.assertEqual(res.status, "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(res.reason_code, "BINDING_MISMATCH")
+        self.assertEqual(len(self.mock_transport.requests), 0)
 
     def test_create_session_invalid_source_name_rejection(self) -> None:
         """sources/default 등 하드코딩이나 빈값/잘못된 포맷의 source_name 전달 시 INVALID_SOURCE_NAME 거부."""
@@ -484,7 +585,7 @@ class TestRealJulesAdapter(unittest.TestCase):
                     contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
                     approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
                     idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
-                    requested_branch="feat/real-api-branch-1",
+                    base_sha=self.base_sha,
                     source_name=bad_src,
                 )
                 res = self.adapter.create_session(req, self.valid_pre_gate)
