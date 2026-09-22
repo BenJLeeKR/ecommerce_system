@@ -4,6 +4,9 @@
 
 - **작업 ID**: `WL-0028-2026-09-22-orchestrator-runtime-db-operating-baseline`
 - **관련 Task ID**: `ORCHESTRATOR-RUNTIME-DB-OPERATING-BASELINE-001`
+- **연결 Backlog**: `BL-0005`
+- **연결 Planning**: 없음
+- **연결 Analysis**: 없음
 - **작업자**: Jules (실행 에이전트)
 - **생성 일시 (KST)**: 2026-09-22
 - **수정 일시 (KST)**: 2026-09-22

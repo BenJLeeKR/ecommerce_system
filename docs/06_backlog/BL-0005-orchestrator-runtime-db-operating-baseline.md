@@ -1,5 +1,10 @@
 # BL-0005: Orchestrator Runtime DB 실제 운영 기준 확립 및 이관
 
+- **상태**: 제안됨 (Proposed)
+- **우선순위**: P0
+- **등록일**: 2026-09-22 (KST)
+- **관련 문서**: [Orchestrator Runtime DB 운영 기준](../01_governance/orchestrator-runtime-db-operations.md)
+
 ## 설명
 Orchestrator의 상태와 기록을 관리하는 Runtime SQLite DB를 안정적으로 운영하기 위한 실제 설정 및 이관 작업을 수행한다. 현재 호출자 주입 방식의 DB 경로를 목표 경로인 `/workspace/runtime/`으로 이관하고, 백업 및 복구 체계를 실제 환경에 적용하기 위해서는 사용자의 결정과 승인이 필요하다.
 
@@ -26,3 +31,9 @@ Orchestrator의 상태와 기록을 관리하는 Runtime SQLite DB를 안정적�
 
 ## 목표
 사용자 결정이 완료되면, 해당 내용을 바탕으로 인프라 프로비저닝 또는 구성 스크립트를 작성하고 실제 경로로의 데이터베이스 이관 및 백업/복구 스케줄러 등록을 완수한다.
+
+## 변경 이력
+
+| 날짜 (KST) | 변경자 | 변경 내용 |
+|------------|--------|-----------|
+| 2026-09-22 | Jules | 최초 등록 |
