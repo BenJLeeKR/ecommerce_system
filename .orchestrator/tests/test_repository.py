@@ -11,6 +11,7 @@ from orchestrator.models import (
     ExecutionRecord,
     StateTransition,
     ScopeValidationRecord,
+    PersistentSessionBinding,
 )
 from orchestrator.repository import (
     StateRepository,
@@ -304,6 +305,80 @@ class TestStateRepository(unittest.TestCase):
         )
         with self.assertRaises(RepositoryError):
             self.repo.save_task(task)
+
+    def test_persistent_session_binding_save_and_get(self):
+        """PersistentSessionBinding 정상 저장 및 조회 검증."""
+        binding = PersistentSessionBinding(
+            task_id="TASK-TEST-001",
+            session_id="sess_12345",
+            branch_name="jules-sess_12345",
+            pr_number=10,
+            contract_hash="hash_contract_123",
+            approved_scope_hash="hash_scope_123",
+            recorded_at_utc="2026-09-17T10:00:00Z"
+        )
+        self.repo.save_persistent_session_binding(binding)
+
+        retrieved = self.repo.get_persistent_session_binding("sess_12345")
+        self.assertIsNotNone(retrieved)
+        self.assertEqual(retrieved.task_id, "TASK-TEST-001")
+        self.assertEqual(retrieved.branch_name, "jules-sess_12345")
+        self.assertEqual(retrieved.pr_number, 10)
+
+        # 멱등성 검증 (동일 데이터 재입력 시 무시)
+        self.repo.save_persistent_session_binding(binding)
+
+    def test_persistent_session_binding_conflicts(self):
+        """PersistentSessionBinding 상충(중복) 시 예외 발생 검증."""
+        binding1 = PersistentSessionBinding(
+            task_id="TASK-TEST-001",
+            session_id="sess_12345",
+            branch_name="jules-sess_12345",
+            pr_number=10,
+            contract_hash="hash_contract_123",
+            approved_scope_hash="hash_scope_123",
+            recorded_at_utc="2026-09-17T10:00:00Z"
+        )
+        self.repo.save_persistent_session_binding(binding1)
+
+        # 1. 동일 세션이지만 결속 정보 다름
+        binding2_conflict = PersistentSessionBinding(
+            task_id="TASK-TEST-002",
+            session_id="sess_12345",
+            branch_name="jules-sess_12345",
+            pr_number=10,
+            contract_hash="hash_contract_123",
+            approved_scope_hash="hash_scope_123",
+            recorded_at_utc="2026-09-17T10:05:00Z"
+        )
+        with self.assertRaises(RepositoryBindingConflictError):
+            self.repo.save_persistent_session_binding(binding2_conflict)
+
+        # 2. 다른 세션이지만 브랜치명 중복
+        binding3_branch_conflict = PersistentSessionBinding(
+            task_id="TASK-TEST-001",
+            session_id="sess_67890",
+            branch_name="jules-sess_12345",
+            pr_number=11,
+            contract_hash="hash_contract_123",
+            approved_scope_hash="hash_scope_123",
+            recorded_at_utc="2026-09-17T10:10:00Z"
+        )
+        with self.assertRaises(RepositoryBindingConflictError):
+            self.repo.save_persistent_session_binding(binding3_branch_conflict)
+
+        # 3. 다른 세션이지만 PR 번호 중복
+        binding4_pr_conflict = PersistentSessionBinding(
+            task_id="TASK-TEST-001",
+            session_id="sess_abcde",
+            branch_name="jules-sess_abcde",
+            pr_number=10,
+            contract_hash="hash_contract_123",
+            approved_scope_hash="hash_scope_123",
+            recorded_at_utc="2026-09-17T10:15:00Z"
+        )
+        with self.assertRaises(RepositoryBindingConflictError):
+            self.repo.save_persistent_session_binding(binding4_pr_conflict)
 
     def test_orchestrator_state_dir_env_not_accessed(self):
         """실제 ORCHESTRATOR_STATE_DIR 환경변수를 접근하지 않는지 검증."""

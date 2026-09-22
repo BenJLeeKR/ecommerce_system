@@ -13,6 +13,7 @@ from .models import (
     ExecutionRecord,
     StateTransition,
     ScopeValidationRecord,
+    PersistentSessionBinding,
 )
 from .validator import validate_utc_iso8601
 
@@ -141,6 +142,20 @@ class StateRepository:
             status TEXT NOT NULL,
             checked_at_utc TEXT NOT NULL,
             reasons_json TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS persistent_session_bindings (
+            task_id TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            branch_name TEXT NOT NULL,
+            pr_number INTEGER NOT NULL,
+            contract_hash TEXT NOT NULL,
+            approved_scope_hash TEXT NOT NULL,
+            recorded_at_utc TEXT NOT NULL,
+            PRIMARY KEY (task_id, session_id),
+            UNIQUE (session_id),
+            UNIQUE (branch_name),
+            UNIQUE (pr_number)
         );
         """
         with self._get_connection() as conn:
@@ -352,6 +367,99 @@ class StateRepository:
                 )
                 for row in rows
             ]
+
+    # 6. PersistentSessionBinding 관리
+    def save_persistent_session_binding(self, binding: PersistentSessionBinding) -> None:
+        """PersistentSessionBinding을 저장합니다.
+
+        세션 ID, 브랜치명, PR 번호 중복(UNIQUE 제약 위배) 혹은 동일 PK(task_id, session_id)라도
+        결속 해시가 다른 경우 RepositoryBindingConflictError를 발생시켜 중복을 차단합니다.
+        동일한 데이터의 재입력은 멱등적으로 성공(무시) 처리합니다.
+        """
+        is_valid, msg = validate_utc_iso8601(binding.recorded_at_utc)
+        if not is_valid:
+            raise RepositoryError(f"recorded_at_utc 유효성 오류: {msg}")
+
+        # 기존 동일 세션 레코드 확인 (동일 데이터 멱등성 및 변경/상충 방지)
+        existing_query = """
+        SELECT task_id, session_id, branch_name, pr_number, contract_hash, approved_scope_hash, recorded_at_utc
+        FROM persistent_session_bindings
+        WHERE session_id = ?
+        """
+        with self._get_connection() as conn:
+            cursor = conn.execute(existing_query, (binding.session_id,))
+            row = cursor.fetchone()
+            if row:
+                if (
+                    row["task_id"] != binding.task_id
+                    or row["branch_name"] != binding.branch_name
+                    or row["pr_number"] != binding.pr_number
+                    or row["contract_hash"] != binding.contract_hash
+                    or row["approved_scope_hash"] != binding.approved_scope_hash
+                ):
+                    raise RepositoryBindingConflictError(
+                        f"세션 '{binding.session_id}'에 대해 이미 상충되는 바인딩 정보가 존재합니다."
+                    )
+                # 완전히 동일한 정보의 재삽입 요청은 멱등성 보장을 위해 무시 (성공)
+                return
+
+            # UNIQUE 제약 조건 검증: branch_name, pr_number 중복 확인
+            conflict_check_query = """
+            SELECT session_id FROM persistent_session_bindings
+            WHERE branch_name = ? OR pr_number = ?
+            """
+            cursor = conn.execute(conflict_check_query, (binding.branch_name, binding.pr_number))
+            conflict_row = cursor.fetchone()
+            if conflict_row:
+                raise RepositoryBindingConflictError(
+                    f"브랜치명 '{binding.branch_name}' 또는 PR 번호 '{binding.pr_number}'가 다른 세션에서 이미 사용 중입니다."
+                )
+
+            # 새 레코드 추가
+            insert_query = """
+            INSERT INTO persistent_session_bindings (
+                task_id, session_id, branch_name, pr_number, contract_hash, approved_scope_hash, recorded_at_utc
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """
+            try:
+                conn.execute(
+                    insert_query,
+                    (
+                        binding.task_id,
+                        binding.session_id,
+                        binding.branch_name,
+                        binding.pr_number,
+                        binding.contract_hash,
+                        binding.approved_scope_hash,
+                        binding.recorded_at_utc,
+                    ),
+                )
+                conn.commit()
+            except sqlite3.IntegrityError as e:
+                # SQLite UNIQUE / PK 제약 위반 발생 시 포착 (Race condition 등 대응)
+                raise RepositoryBindingConflictError(f"데이터베이스 무결성 제약 위반: {str(e)}")
+
+    def get_persistent_session_binding(self, session_id: str) -> Optional[PersistentSessionBinding]:
+        """주어진 세션 ID에 대한 바인딩 정보를 반환합니다."""
+        query = """
+        SELECT task_id, session_id, branch_name, pr_number, contract_hash, approved_scope_hash, recorded_at_utc
+        FROM persistent_session_bindings
+        WHERE session_id = ?
+        """
+        with self._get_connection() as conn:
+            cursor = conn.execute(query, (session_id,))
+            row = cursor.fetchone()
+            if row:
+                return PersistentSessionBinding(
+                    task_id=row["task_id"],
+                    session_id=row["session_id"],
+                    branch_name=row["branch_name"],
+                    pr_number=row["pr_number"],
+                    contract_hash=row["contract_hash"],
+                    approved_scope_hash=row["approved_scope_hash"],
+                    recorded_at_utc=row["recorded_at_utc"],
+                )
+            return None
 
     # 3. ExecutionRecord 관리
     def save_execution(self, execution: ExecutionRecord) -> None:

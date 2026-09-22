@@ -14,10 +14,12 @@ from .models import (
     ExecutionResultInput,
     CodexReviewResultPackage,
     StateTransition,
+    PersistentSessionBinding,
 )
 from .jules_adapter import JulesSessionResponse, ActivitySummary, TransportError
 from .validator import validate_changed_files_against_scope_lock
 from .result_package import generate_result_package
+from .repository import StateRepository, RepositoryBindingConflictError
 
 
 class CodexNotificationAdapter(ABC):
@@ -48,6 +50,7 @@ def execute_review_handoff(
     transition_agent: str,
     jules_adapter: Any,  # RealJulesAdapter 또는 Test Double
     codex_adapter: CodexNotificationAdapter,
+    repository: Optional[StateRepository] = None,
     verified_session: Optional[JulesSessionResponse] = None,
 ) -> StateTransition:
     """Jules 완료 감지부터 검토 인계까지의 흐름을 실행합니다.
@@ -147,8 +150,58 @@ def execute_review_handoff(
         existing_session=session_info
     )
 
-    # 5. 판정 및 상태 전이 반환
+    # 5. 판정, 영속 결속 및 상태 전이 반환
     if result_package.status == "RESULT_COLLECTED":
+        if repository is not None:
+            # PR 번호 변환 시도
+            try:
+                if isinstance(pr_identifier, int):
+                    pr_num = pr_identifier
+                elif isinstance(pr_identifier, str):
+                    import re
+                    # URL 형태(예: https://github.com/owner/repo/pull/123)에서 번호 추출 시도
+                    match = re.search(r'/pull/(\d+)', pr_identifier)
+                    if match:
+                        pr_num = int(match.group(1))
+                    else:
+                        pr_num = int(pr_identifier)
+                else:
+                    raise ValueError("지원하지 않는 PR 식별자 형식입니다.")
+            except (ValueError, TypeError):
+                return StateTransition(
+                    transition_id=f"trans-{_now_utc_iso()}",
+                    task_id=task_id,
+                    from_status="COMPLETED",
+                    to_status="NEEDS_HUMAN_REVIEW",
+                    transition_agent=transition_agent,
+                    recorded_at_utc=now_utc,
+                    reason="INVALID_PR_IDENTIFIER"
+                )
+
+            binding = PersistentSessionBinding(
+                task_id=task_id,
+                session_id=session_id,
+                branch_name=branch_name,
+                pr_number=pr_num,
+                contract_hash=expected_contract_hash,
+                approved_scope_hash=expected_approved_scope_hash,
+                recorded_at_utc=now_utc
+            )
+
+            try:
+                repository.save_persistent_session_binding(binding)
+            except RepositoryBindingConflictError:
+                # 결속 충돌 시 무저장·무알림 원칙(NEEDS_HUMAN_REVIEW 전이 반환만)
+                return StateTransition(
+                    transition_id=f"trans-{_now_utc_iso()}",
+                    task_id=task_id,
+                    from_status="COMPLETED",
+                    to_status="NEEDS_HUMAN_REVIEW",
+                    transition_agent=transition_agent,
+                    recorded_at_utc=now_utc,
+                    reason="BINDING_CONFLICT"
+                )
+
         # 검토 준비 완료 알림 전송 (비민감 패키지 전달)
         codex_adapter.notify_review_ready(result_package)
 
