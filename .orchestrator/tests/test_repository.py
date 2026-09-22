@@ -380,6 +380,31 @@ class TestStateRepository(unittest.TestCase):
         with self.assertRaises(RepositoryBindingConflictError):
             self.repo.save_persistent_session_binding(binding4_pr_conflict)
 
+    def test_persistent_session_binding_restart(self):
+        """저장소 재생성 후에도 데이터가 정상적으로 조회되는지 재시작 검증."""
+        binding = PersistentSessionBinding(
+            task_id="TASK-TEST-001",
+            session_id="sess_restart",
+            branch_name="jules-sess_restart",
+            pr_number=42,
+            contract_hash="hash_contract_123",
+            approved_scope_hash="hash_scope_123",
+            recorded_at_utc="2026-09-17T10:00:00Z"
+        )
+        self.repo.save_persistent_session_binding(binding)
+
+        # 저장소 연결 닫기 유도 (SQLite3는 객체 참조가 없어지면 닫힘, 파일 기반이므로 재연결 가능)
+        del self.repo
+
+        # 동일한 파일 경로로 새 StateRepository 인스턴스 생성
+        new_repo = StateRepository(self.db_path)
+        retrieved = new_repo.get_persistent_session_binding("sess_restart")
+
+        self.assertIsNotNone(retrieved)
+        self.assertEqual(retrieved.task_id, "TASK-TEST-001")
+        self.assertEqual(retrieved.branch_name, "jules-sess_restart")
+        self.assertEqual(retrieved.pr_number, 42)
+
     def test_orchestrator_state_dir_env_not_accessed(self):
         """실제 ORCHESTRATOR_STATE_DIR 환경변수를 접근하지 않는지 검증."""
         old_env = os.environ.get("ORCHESTRATOR_STATE_DIR")

@@ -201,6 +201,17 @@ def execute_review_handoff(
                     recorded_at_utc=now_utc,
                     reason="BINDING_CONFLICT"
                 )
+            except Exception:
+                # 일반 저장소 오류 및 예기치 않은 오류 발생 시에도 원시 오류 노출 및 알림 없이 NEEDS_HUMAN_REVIEW 처리
+                return StateTransition(
+                    transition_id=f"trans-{_now_utc_iso()}",
+                    task_id=task_id,
+                    from_status="COMPLETED",
+                    to_status="NEEDS_HUMAN_REVIEW",
+                    transition_agent=transition_agent,
+                    recorded_at_utc=now_utc,
+                    reason="BINDING_SAVE_ERROR"
+                )
 
         # 검토 준비 완료 알림 전송 (비민감 패키지 전달)
         codex_adapter.notify_review_ready(result_package)
