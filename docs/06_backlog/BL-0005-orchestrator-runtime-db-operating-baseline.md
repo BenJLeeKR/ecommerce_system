@@ -1,6 +1,6 @@
 # BL-0005: Orchestrator Runtime DB 실제 운영 기준 확립 및 이관
 
-- **상태**: 진행 중 (In Progress)
+- **상태**: 제안됨 (Proposed)
 - **우선순위**: P1
 - **등록일**: 2026-09-22 (KST)
 - **관련 문서**: [Orchestrator Runtime DB 운영 기준](../01_governance/orchestrator-runtime-db-operations.md)
@@ -41,4 +41,4 @@ Orchestrator의 상태와 기록을 관리하는 Runtime SQLite DB를 안정적�
 
 ## 진행 상황 및 업데이트
 
-- **2026-09-23 (KST)**: 외부 상태 디렉터리 생성 및 빈 초기 DB 초기화가 완료되었으며, 실행 계정(`ubuntu:ubuntu`) 권한이 적용되었다. 다만 결속 데이터 미기록 상태 및 백업·복구 기준(RPO/RTO) 미결로 인해 백업/복구 구성을 위한 추가 논의와 결정이 필요하여 진행 중 상태로 갱신함.
+- **2026-09-23 (KST)**: 외부 상태 디렉터리 생성 및 빈 초기 DB 초기화가 완료되었으며, 실행 계정(`ubuntu:ubuntu`) 권한이 적용되었다. 다만 결속 데이터 미기록 상태 및 백업·복구 기준(RPO/RTO) 미결로 인해 백업/복구 구성을 위한 추가 논의와 결정이 필요하여 제안됨 상태를 유지함.

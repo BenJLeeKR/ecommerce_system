@@ -1,6 +1,6 @@
-# WL-0033-2026-09-23-Runtime-DB-Initialization-Documentation
+# WL-0033: Runtime DB 초기화 문서 정합화
 
-- 상태: Completed
+- 상태: 완료
 - 작업일: 2026-09-23
 - 연결 Backlog: `BL-0005`
 - 연결 Planning: 없음
