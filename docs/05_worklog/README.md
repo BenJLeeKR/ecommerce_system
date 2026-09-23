@@ -34,3 +34,4 @@
 - [WL-0030-2026-09-23-orchestrator-repository-integration](WL-0030-2026-09-23-orchestrator-repository-integration.md) — Orchestrator 상태 저장소 연동 팩토리 구현 및 테스트 환경 구성 완료 기록.
 - [WL-0031-2026-09-23-orchestrator-runtime-binding-injection](WL-0031-2026-09-23-orchestrator-runtime-binding-injection.md) — Orchestrator 완료 검토 인계 과정에 상태 저장소 팩토리 주입 지점 구현.
 - [WL-0032](WL-0032-2026-09-23-runtime-entrypoint-integration.md) — 최상위 검토 인계 진입점 통합 준비와 테스트 및 Worklog 갱신을 완료했다.
+- [WL-0033-2026-09-23-runtime-db-initialization-documentation](WL-0033-2026-09-23-runtime-db-initialization.md) — 외부 상태 디렉터리 생성, 빈 DB 초기화 및 권한 적용을 비민감 범위 내에서 문서에 정합화한 내역 기록.
