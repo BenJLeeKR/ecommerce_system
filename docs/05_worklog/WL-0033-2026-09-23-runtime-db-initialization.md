@@ -9,12 +9,12 @@
 
 ## 1. 목적
 
-Thin Orchestrator Runtime 상태 및 기록 관리를 위해 외부 상태 디렉터리 생성 및 빈 SQLite DB 초기화, 그리고 실행 계정 최소 권한이 적용된 결과를 비민감 범위 내에서 문서에 정합화하고 이력을 남긴다.
+Thin Orchestrator Runtime 상태 및 기록 관리를 위해 외부 상태 디렉터리 확인 및 최소 권한 적용, 빈 초기 SQLite DB 초기화가 완료된 결과를 비민감 범위 내에서 문서에 정합화하고 이력을 남긴다.
 
 ## 2. 수행 내용
 
 - `docs/01_governance/orchestrator-runtime-db-operations.md` 갱신
-  - Git 트리를 벗어난 외부 상태 디렉터리 구성 및 빈 DB 초기화가 완료되었음을 명시.
+  - Git 트리를 벗어난 외부 상태 디렉터리 확인 및 빈 DB 초기화가 완료되었음을 명시.
   - 실행 계정(`ubuntu:ubuntu`)에 대한 최소 권한 부여 완료 사실 기록.
   - 아직 실제 1:1:1 결속 데이터가 기록되지 않은 무저장 상태임과 백업/복구(RPO/RTO) 미구성/미결 상태를 문서에 반영.
 - `docs/06_backlog/BL-0005-orchestrator-runtime-db-operating-baseline.md` 상태 업데이트

@@ -9,8 +9,7 @@ Orchestrator는 상태, 컨텍스트, 작업 기록을 유지하기 위해 SQLit
 ## 2. 외부 저장 원칙 및 경로
 
 - **현재 상태**: SQLite DB 경로는 코드 내에 고정되지 않고, 명시적인 호출자(Caller) 주입(Injection) 방식을 유지한다. `ORCHESTRATOR_JULES_STATE_DIR` 환경 변수를 이용한 검증과 Jules 전용 상태 저장소 팩토리(`get_jules_state_repository`)가 `execute_review_handoff_with_repository` 진입점에 통합 완료되었다.
-  - 외부 상태 디렉터리 및 빈 초기 SQLite DB 초기화가 완료되었다.
-  - 실행 계정(`ubuntu:ubuntu`)에 대한 최소 권한 적용이 완료되었다.
+  - 외부 상태 디렉터리 확인 및 최소 권한 적용, 빈 초기 SQLite DB 초기화가 완료되었다.
 - **Git 통제**: 상태 디렉터리와 내부 DB 파일은 절대 Git 리포지토리에 커밋되지 않아야 하며, Git 작업 트리 외부에 존재해야 한다.
 
 ## 3. 상태 저장소 인계 통합 지점
