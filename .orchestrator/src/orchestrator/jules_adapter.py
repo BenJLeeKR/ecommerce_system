@@ -218,7 +218,7 @@ class FakeJulesAdapter(JulesAdapter):
                     created_at_utc=now,
                     updated_at_utc=now,
                 )
-        except ScopeCanonicalizationError:
+        except Exception:
             return JulesSessionResponse(
                 session_id="",
                 task_id=request.task_id,
@@ -641,7 +641,7 @@ class RealJulesAdapter(JulesAdapter):
                     created_at_utc=now,
                     updated_at_utc=now,
                 )
-        except ScopeCanonicalizationError:
+        except Exception:
             return JulesSessionResponse(
                 session_id="",
                 task_id=request.task_id,

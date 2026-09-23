@@ -157,6 +157,37 @@ class TestValidateSourceName(unittest.TestCase):
 
 
 class TestFakeJulesAdapter(unittest.TestCase):
+    def test_create_session_scope_canonicalization_general_exception(self):
+        adapter = FakeJulesAdapter()
+
+        req = JulesSessionRequest(
+            task_id="TSK-111",
+            contract_hash="hash_c",
+            approved_scope_hash="hash_s",
+            idempotency_key="idemp_1",
+            base_sha="sha_base",
+            allowed_paths=None, # This should raise an exception during canonicalize_scope
+            forbidden_paths=SAMPLE_FORBIDDEN_PATHS,
+            source_name="sources/github/owner/repo"
+        )
+
+        gate_res = PreGateResult(
+            is_valid=True,
+            is_dispatch_eligible=False,
+            is_session_creation_authorized=True,
+            status="APPROVED",
+            task_id="TSK-111",
+            contract_hash="hash_c",
+            approved_scope_hash="hash_s",
+            idempotency_key="idemp_1",
+            base_sha="sha_base",
+        )
+
+        resp = adapter.create_session(req, gate_res)
+        self.assertEqual(resp.status, "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(resp.reason_code, "SCOPE_LOCK_CANONICALIZATION_FAILED")
+        self.assertEqual(adapter._session_counter, 0)
+
     def test_create_session_scope_canonicalization_failed(self):
         adapter = FakeJulesAdapter()
         # Invalid paths to cause ScopeCanonicalizationError
@@ -528,6 +559,23 @@ class TestFakeJulesAdapter(unittest.TestCase):
 
 
 class TestRealJulesAdapter(unittest.TestCase):
+    def test_create_session_scope_canonicalization_general_exception_prevents_api_call(self):
+        req = JulesSessionRequest(
+            task_id="REAL-TASK-001",
+            contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
+            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
+            base_sha=self.base_sha,
+            allowed_paths=None, # This should raise an exception
+            forbidden_paths=SAMPLE_FORBIDDEN_PATHS,
+            source_name="sources/github/test-owner/test-repository"
+        )
+
+        resp = self.adapter.create_session(req, self.valid_pre_gate)
+        self.assertEqual(resp.status, "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(resp.reason_code, "SCOPE_LOCK_CANONICALIZATION_FAILED")
+        self.assertEqual(len(self.mock_transport.requests), 0)
+
 
     def test_create_session_scope_canonicalization_failed_prevents_api_call(self):
         invalid_paths = [PathItem(path="/absolute/path", kind="file")]
