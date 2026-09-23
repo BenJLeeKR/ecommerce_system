@@ -6,9 +6,9 @@
 - **관련 문서**: [Orchestrator Runtime DB 운영 기준](../01_governance/orchestrator-runtime-db-operations.md)
 
 ## 설명
-Orchestrator의 상태와 기록을 관리하는 Runtime SQLite DB를 안정적으로 운영하기 위한 실제 설정 및 이관 작업을 수행한다. 현재는 `ORCHESTRATOR_JULES_STATE_DIR`를 이용해 **Jules 전용 상태 저장소 팩토리(`get_jules_state_repository`)와 테스트 연결 준비가 완료**된 상태이다. 그러나 실제 코드 호출부에서 해당 팩토리를 통해 repository를 생성·주입하거나 운영 환경용 Runtime DB를 실제로 초기화하는 작업은 제외되어 있다.
+Orchestrator의 상태와 기록을 관리하는 Runtime SQLite DB를 안정적으로 운영하기 위한 실제 설정 및 이관 작업을 수행한다. 현재는 `ORCHESTRATOR_JULES_STATE_DIR`를 이용해 **Jules 전용 상태 저장소 팩토리(`get_jules_state_repository`)가 준비**되었고, 이를 `execute_review_handoff`에 `jules_state_repository_factory` 인자로 주입할 수 있도록 통합 지점까지 구현 완료된 상태이다. 그러나 운영 환경용 Runtime DB를 실제로 초기화하거나 전체 시스템 진입점에서 팩토리를 실제로 주입하는 작업은 여전히 제외되어 있다.
 
-따라서 목표 경로인 `/workspace/runtime/`으로 실제 환경을 구성하고, 실제 `.env` 적용, 기존 DB 호출부로의 팩토리 연결, 실제 DB 생성, 백업 및 복구 체계를 구축하는 것은 전적으로 사용자의 결정 및 추가 승인 이후 후속 작업으로 수행되어야 한다.
+따라서 목표 경로인 `/workspace/runtime/`으로 실제 환경을 구성하고, 실제 `.env` 적용, 최상위 진입점에서의 팩토리 주입, 실제 DB 생성, 백업 및 복구 체계를 구축하는 것은 전적으로 사용자의 결정 및 추가 승인 이후 후속 작업으로 수행되어야 한다.
 
 본 백로그는 향후 승인된 기반에서 실제 환경 설정 및 시스템 변경(디렉터리/DB 생성 및 연결 등)을 완수하는 것을 목표로 한다.
 
@@ -41,3 +41,4 @@ Orchestrator의 상태와 기록을 관리하는 Runtime SQLite DB를 안정적�
 | 2026-09-22 | Jules | 최초 등록 |
 | 2026-09-23 | Jules | 환경 변수(`ORCHESTRATOR_JULES_STATE_DIR`) 도입으로 인한 이관 계획 내용 갱신 |
 | 2026-09-23 | Jules | 상태 저장소 팩토리 생성 및 테스트 연결 준비 완료 상태로 변경 |
+| 2026-09-23 | Jules | review_handoff 내 jules_state_repository_factory 통합 지점 구현 상태로 갱신 |

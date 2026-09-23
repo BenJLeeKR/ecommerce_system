@@ -518,5 +518,224 @@ class TestReviewHandoff(unittest.TestCase):
             self.assertEqual(transition.reason, "BINDING_SAVE_ERROR")
             self.assertEqual(len(self.codex_adapter.notified_packages), 0)
 
+
+    def test_factory_injection_without_repository(self):
+        """repository 없이 jules_state_repository_factory가 전달되면 팩토리가 호출되어
+        결속이 저장되는지 검증합니다.
+        """
+        jules_adapter = MockJulesAdapter(self.valid_session, self.completed_activities)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "test_state.db"
+
+            # 테스트에서 팩토리 호출 시 생성/초기화할 StateRepository 반환
+            def repo_factory():
+                return StateRepository(db_path)
+
+            changed_files = ["src/main.py"]
+
+            transition = execute_review_handoff(
+                task_id=self.task_id,
+                session_id=self.session_id,
+                branch_name=self.branch_name,
+                pr_identifier=self.pr_identifier,
+                changed_files=changed_files,
+                allowed_paths=self.allowed_paths,
+                forbidden_paths=self.forbidden_paths,
+                expected_contract_hash=self.contract_hash,
+                expected_approved_scope_hash=self.approved_scope_hash,
+                expected_idempotency_key=self.idempotency_key,
+                expected_approval_id=self.approval_id,
+                transition_agent=self.transition_agent,
+                jules_adapter=jules_adapter,
+                codex_adapter=self.codex_adapter,
+                jules_state_repository_factory=repo_factory,
+                verified_session=self.valid_session,
+            )
+
+            self.assertEqual(transition.to_status, "REVIEW_READY_DETECTED")
+
+            # DB에 저장되었는지 확인
+            active_repo = StateRepository(db_path)
+            binding = active_repo.get_persistent_session_binding(self.session_id)
+            self.assertIsNotNone(binding)
+            self.assertEqual(binding.session_id, self.session_id)
+            self.assertEqual(binding.pr_number, 42)
+
+    def test_repository_takes_precedence_over_factory(self):
+        """직접 repository와 jules_state_repository_factory를 함께 전달하면 직접 repository가 우선이며 팩토리는 호출되지 않는지 검증합니다."""
+        jules_adapter = MockJulesAdapter(self.valid_session, self.completed_activities)
+
+        factory_called = False
+        def repo_factory():
+            nonlocal factory_called
+            factory_called = True
+            raise Exception("이 팩토리는 호출되지 않아야 합니다.")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "test_state.db"
+            direct_repository = StateRepository(db_path)
+            changed_files = ["src/main.py"]
+
+            transition = execute_review_handoff(
+                task_id=self.task_id,
+                session_id=self.session_id,
+                branch_name=self.branch_name,
+                pr_identifier=self.pr_identifier,
+                changed_files=changed_files,
+                allowed_paths=self.allowed_paths,
+                forbidden_paths=self.forbidden_paths,
+                expected_contract_hash=self.contract_hash,
+                expected_approved_scope_hash=self.approved_scope_hash,
+                expected_idempotency_key=self.idempotency_key,
+                expected_approval_id=self.approval_id,
+                transition_agent=self.transition_agent,
+                jules_adapter=jules_adapter,
+                codex_adapter=self.codex_adapter,
+                repository=direct_repository,
+                jules_state_repository_factory=repo_factory,
+                verified_session=self.valid_session,
+            )
+
+            self.assertEqual(transition.to_status, "REVIEW_READY_DETECTED")
+            self.assertFalse(factory_called, "팩토리가 호출되었습니다. 직접 repository가 우선시되어야 합니다.")
+
+            # 직접 주입된 DB에 저장되었는지 확인
+            binding = direct_repository.get_persistent_session_binding(self.session_id)
+            self.assertIsNotNone(binding)
+            self.assertEqual(binding.session_id, self.session_id)
+
+    def test_no_repository_and_no_factory_keeps_legacy_behavior(self):
+        """repository와 팩토리를 모두 전달하지 않으면 기존처럼 영속 저장 없이 검토 인계가 유지되는지 검증합니다."""
+        jules_adapter = MockJulesAdapter(self.valid_session, self.completed_activities)
+        changed_files = ["src/main.py"]
+
+        transition = execute_review_handoff(
+            task_id=self.task_id,
+            session_id=self.session_id,
+            branch_name=self.branch_name,
+            pr_identifier=self.pr_identifier,
+            changed_files=changed_files,
+            allowed_paths=self.allowed_paths,
+            forbidden_paths=self.forbidden_paths,
+            expected_contract_hash=self.contract_hash,
+            expected_approved_scope_hash=self.approved_scope_hash,
+            expected_idempotency_key=self.idempotency_key,
+            expected_approval_id=self.approval_id,
+            transition_agent=self.transition_agent,
+            jules_adapter=jules_adapter,
+            codex_adapter=self.codex_adapter,
+            # repository=None, (기본값)
+            # jules_state_repository_factory=None, (기본값)
+            verified_session=self.valid_session,
+        )
+
+        self.assertEqual(transition.to_status, "REVIEW_READY_DETECTED")
+
+        # 알림이 보내졌는지 확인 (영속 저장은 없지만 알림은 가야함)
+        self.assertEqual(len(self.codex_adapter.notified_packages), 1)
+
+    def test_factory_init_error_aborts_handoff(self):
+        """jules_state_repository_factory 초기화 실패 시 무알림/무저장 및 NEEDS_HUMAN_REVIEW (FACTORY_INIT_ERROR) 전이 검증."""
+        jules_adapter = MockJulesAdapter(self.valid_session, self.completed_activities)
+
+        def failing_factory():
+            raise Exception("DB 접속 실패 등 팩토리 내부 에러")
+
+        changed_files = ["src/main.py"]
+
+        transition = execute_review_handoff(
+            task_id=self.task_id,
+            session_id=self.session_id,
+            branch_name=self.branch_name,
+            pr_identifier=self.pr_identifier,
+            changed_files=changed_files,
+            allowed_paths=self.allowed_paths,
+            forbidden_paths=self.forbidden_paths,
+            expected_contract_hash=self.contract_hash,
+            expected_approved_scope_hash=self.approved_scope_hash,
+            expected_idempotency_key=self.idempotency_key,
+            expected_approval_id=self.approval_id,
+            transition_agent=self.transition_agent,
+            jules_adapter=jules_adapter,
+            codex_adapter=self.codex_adapter,
+            jules_state_repository_factory=failing_factory,
+            verified_session=self.valid_session,
+        )
+
+        self.assertEqual(transition.to_status, "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(transition.reason, "FACTORY_INIT_ERROR")
+        self.assertEqual(len(self.codex_adapter.notified_packages), 0)
+
+    def test_factory_returns_none_aborts_handoff(self):
+        """jules_state_repository_factory가 None을 반환하면 무알림/무저장, FACTORY_INIT_ERROR 전이됨을 검증."""
+        jules_adapter = MockJulesAdapter(self.valid_session, self.completed_activities)
+
+        def none_factory():
+            return None
+
+        changed_files = ["src/main.py"]
+
+        transition = execute_review_handoff(
+            task_id=self.task_id,
+            session_id=self.session_id,
+            branch_name=self.branch_name,
+            pr_identifier=self.pr_identifier,
+            changed_files=changed_files,
+            allowed_paths=self.allowed_paths,
+            forbidden_paths=self.forbidden_paths,
+            expected_contract_hash=self.contract_hash,
+            expected_approved_scope_hash=self.approved_scope_hash,
+            expected_idempotency_key=self.idempotency_key,
+            expected_approval_id=self.approval_id,
+            transition_agent=self.transition_agent,
+            jules_adapter=jules_adapter,
+            codex_adapter=self.codex_adapter,
+            jules_state_repository_factory=none_factory,
+            verified_session=self.valid_session,
+        )
+
+        self.assertEqual(transition.to_status, "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(transition.reason, "FACTORY_INIT_ERROR")
+        self.assertEqual(len(self.codex_adapter.notified_packages), 0)
+
+    def test_factory_save_exception_aborts_handoff(self):
+        """팩토리가 반환한 저장소의 save_persistent_session_binding 실패 시 BINDING_SAVE_ERROR 전이됨을 검증."""
+        jules_adapter = MockJulesAdapter(self.valid_session, self.completed_activities)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "test_state.db"
+            class ErrorRepository(StateRepository):
+                def save_persistent_session_binding(self, binding):
+                    raise Exception("Unexpected save error from factory repo")
+
+            def repo_factory():
+                return ErrorRepository(db_path)
+
+            changed_files = ["src/main.py"]
+
+            transition = execute_review_handoff(
+                task_id=self.task_id,
+                session_id=self.session_id,
+                branch_name=self.branch_name,
+                pr_identifier=self.pr_identifier,
+                changed_files=changed_files,
+                allowed_paths=self.allowed_paths,
+                forbidden_paths=self.forbidden_paths,
+                expected_contract_hash=self.contract_hash,
+                expected_approved_scope_hash=self.approved_scope_hash,
+                expected_idempotency_key=self.idempotency_key,
+                expected_approval_id=self.approval_id,
+                transition_agent=self.transition_agent,
+                jules_adapter=jules_adapter,
+                codex_adapter=self.codex_adapter,
+                jules_state_repository_factory=repo_factory,
+                verified_session=self.valid_session,
+            )
+
+            self.assertEqual(transition.to_status, "NEEDS_HUMAN_REVIEW")
+            self.assertEqual(transition.reason, "BINDING_SAVE_ERROR")
+            self.assertEqual(len(self.codex_adapter.notified_packages), 0)
+
 if __name__ == "__main__":
     unittest.main()
