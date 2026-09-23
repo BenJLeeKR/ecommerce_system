@@ -30,3 +30,4 @@
 - [WL-0026](WL-0026-2026-09-22-jules-main-start-branch-guard.md) — Jules 세션 main 시작 및 예상 브랜치 사후 결속 정책을 어댑터와 거버넌스에 반영했다.
 - [WL-0027](WL-0027-2026-09-22-persistent-session-binding.md) — Jules 세션 ID, 브랜치명, PR 번호를 SQLite DB에 영속 결속하여 1:1:1 중복 및 불일치를 차단하는 모델을 추가했다.
 - [WL-0028-2026-09-22-orchestrator-runtime-db-operating-baseline](WL-0028-2026-09-22-orchestrator-runtime-db-operating-baseline.md) — Orchestrator Runtime DB 저장 원칙 및 미결 백업·복구 기준 문서화 완료 기록.
+- [WL-0029-2026-09-23-orchestrator-jules-state-dir](WL-0029-2026-09-23-orchestrator-jules-state-dir.md) — Orchestrator 상태 디렉터리 경로 환경 변수 로더 추가 및 외부 경로 검증 로직 구현.

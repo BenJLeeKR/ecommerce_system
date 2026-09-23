@@ -62,6 +62,39 @@ def load_jules_api_key(env_file: Optional[Union[str, Path]] = None) -> str:
     return api_key
 
 
+def load_orchestrator_jules_state_dir(
+    env_file: Optional[Union[str, Path]] = None,
+) -> Path:
+    """ORCHESTRATOR_JULES_STATE_DIR 환경 변수를 읽어 안전한 외부 경로인지 검증하고 반환한다.
+
+    이 경로는 반드시 절대 경로여야 하며, 현재 Git 리포지토리 루트 경로의 내부에 있어서는 안 된다.
+    """
+    env_path = Path(env_file) if env_file is not None else _DEFAULT_ENV_FILE
+    values = _parse_env_file(env_path)
+
+    state_dir_str = values.get("ORCHESTRATOR_JULES_STATE_DIR", "").strip()
+    if not state_dir_str:
+        raise RuntimeConfigError("필수 런타임 설정이 비어 있습니다: ORCHESTRATOR_JULES_STATE_DIR")
+
+    state_dir = Path(state_dir_str)
+
+    if not state_dir.is_absolute():
+        raise RuntimeConfigError("ORCHESTRATOR_JULES_STATE_DIR는 반드시 절대 경로여야 합니다.")
+
+    repo_root = _DEFAULT_ENV_FILE.parent.parent.resolve()
+
+    try:
+        resolved_state_dir = state_dir.resolve()
+        is_inside_repo = repo_root in resolved_state_dir.parents or resolved_state_dir == repo_root
+    except Exception as error:
+        raise RuntimeConfigError("ORCHESTRATOR_JULES_STATE_DIR 경로를 해석할 수 없습니다.") from error
+
+    if is_inside_repo:
+        raise RuntimeConfigError("ORCHESTRATOR_JULES_STATE_DIR는 Git 리포지토리 외부 경로여야 합니다.")
+
+    return state_dir
+
+
 def load_jules_runtime_config(
     env_file: Optional[Union[str, Path]] = None,
 ) -> JulesRuntimeConfig:

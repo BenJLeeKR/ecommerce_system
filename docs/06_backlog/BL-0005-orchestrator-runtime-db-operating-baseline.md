@@ -6,7 +6,7 @@
 - **관련 문서**: [Orchestrator Runtime DB 운영 기준](../01_governance/orchestrator-runtime-db-operations.md)
 
 ## 설명
-Orchestrator의 상태와 기록을 관리하는 Runtime SQLite DB를 안정적으로 운영하기 위한 실제 설정 및 이관 작업을 수행한다. 현재 호출자 주입 방식의 DB 경로를 목표 경로인 `/workspace/runtime/`으로 이관하고, 백업 및 복구 체계를 실제 환경에 적용하기 위해서는 사용자의 결정과 승인이 필요하다.
+Orchestrator의 상태와 기록을 관리하는 Runtime SQLite DB를 안정적으로 운영하기 위한 실제 설정 및 이관 작업을 수행한다. 현재 환경 변수(`ORCHESTRATOR_JULES_STATE_DIR`)를 통한 호출자 주입 방식의 DB 경로를 목표 경로인 `/workspace/runtime/`으로 실제 환경에 구성하고, 백업 및 복구 체계를 적용하기 위해서는 사용자의 결정과 승인이 필요하다.
 
 본 백로그는 실제 환경 설정 및 시스템 변경을 목표로 하며, 거버넌스에서 정의된 원칙을 구현하는 단계이다.
 
@@ -37,3 +37,4 @@ Orchestrator의 상태와 기록을 관리하는 Runtime SQLite DB를 안정적�
 | 날짜 (KST) | 변경자 | 변경 내용 |
 |------------|--------|-----------|
 | 2026-09-22 | Jules | 최초 등록 |
+| 2026-09-23 | Jules | 환경 변수(`ORCHESTRATOR_JULES_STATE_DIR`) 도입으로 인한 이관 계획 내용 갱신 |
