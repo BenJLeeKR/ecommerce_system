@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 from typing import List, Optional
 
 from orchestrator.models import (
@@ -193,5 +194,41 @@ class TestReviewEntrypoint(unittest.TestCase):
         self.assertFalse(factory_called, "Factory should not be called if review handoff is not successful")
         self.assertEqual(transition.to_status, "NEEDS_HUMAN_REVIEW")
 
+
+    def test_default_factory_is_passed(self):
+        """jules_state_repository_factory 인자를 생략했을 때 get_jules_state_repository가 기본값으로 전달되는지 확인."""
+        from orchestrator.runtime_config import get_jules_state_repository
+
+        with patch('orchestrator.review_entrypoint.execute_review_handoff') as mock_handoff:
+            from orchestrator.models import StateTransition
+            mock_handoff.return_value = StateTransition(
+                transition_id="test", task_id="test", from_status="test", to_status="test", transition_agent="test", recorded_at_utc="test", reason=None
+            )
+
+            # call without specifying factory or repository
+            execute_review_handoff_with_repository(
+                task_id=self.valid_task_id,
+                session_id=self.valid_session_id,
+                branch_name=self.valid_branch,
+                pr_identifier=self.valid_pr,
+                changed_files=self.valid_changed_files,
+                allowed_paths=self.valid_allowed_paths,
+                forbidden_paths=[],
+                expected_contract_hash=self.expected_hash,
+                expected_approved_scope_hash=self.expected_hash,
+                expected_idempotency_key="idemp_123",
+                expected_approval_id="app_123",
+                transition_agent="test_agent",
+                jules_adapter=self.jules_adapter,
+                codex_adapter=self.codex_adapter,
+                verified_session=self.valid_session
+            )
+
+            mock_handoff.assert_called_once()
+            kwargs = mock_handoff.call_args.kwargs
+            self.assertEqual(kwargs.get('jules_state_repository_factory'), get_jules_state_repository)
+            self.assertIsNone(kwargs.get('repository'))
+
 if __name__ == '__main__':
+
     unittest.main()

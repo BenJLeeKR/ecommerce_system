@@ -6,7 +6,7 @@
 - **관련 문서**: [Orchestrator Runtime DB 운영 기준](../01_governance/orchestrator-runtime-db-operations.md)
 
 ## 설명
-Orchestrator의 상태와 기록을 관리하는 Runtime SQLite DB를 안정적으로 운영하기 위한 실제 설정 및 이관 작업을 수행한다. 현재는 `ORCHESTRATOR_JULES_STATE_DIR`를 이용해 **Jules 전용 상태 저장소 팩토리(`get_jules_state_repository`)가 준비**되었고, 이를 `execute_review_handoff`에 `jules_state_repository_factory` 인자로 주입할 수 있도록 통합 지점까지 구현 완료된 상태이다. 그러나 운영 환경용 Runtime DB를 실제로 초기화하거나 전체 시스템 진입점에서 팩토리를 실제로 주입하는 작업은 여전히 제외되어 있다.
+Orchestrator의 상태와 기록을 관리하는 Runtime SQLite DB를 안정적으로 운영하기 위한 실제 설정 및 이관 작업을 수행한다. 현재는 `ORCHESTRATOR_JULES_STATE_DIR`를 이용해 **Jules 전용 상태 저장소 팩토리(`get_jules_state_repository`)가 준비**되었고, 이를 `execute_review_handoff`에 `jules_state_repository_factory` 인자로 주입할 수 있도록 통합 지점까지 구현 완료된 상태이다. 최상위 시스템 진입점에서의 팩토리 주입 통합은 완료되었으나, 운영 환경용 실제 외부 Runtime DB를 생성하거나 연결하는 호출 작업은 여전히 제외되어 있다.
 
 따라서 실제 환경을 구성하고, `ORCHESTRATOR_JULES_STATE_DIR` 환경 변수 적용, 최상위 진입점 호출부 연결, 실제 DB 생성, 권한 적용(`ubuntu:ubuntu`), 백업 및 복구 체계(현재 미구성)를 구축하는 것은 후속 Codex 운영 작업으로 수행되어야 한다.
 

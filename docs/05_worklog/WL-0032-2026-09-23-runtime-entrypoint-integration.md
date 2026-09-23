@@ -1,4 +1,4 @@
-# Worklog: 최상위 검토 인계 진입점 통합
+# WL-0032: 최상위 검토 인계 진입점 통합
 
 - 작성일: 2026-09-23 (KST)
 - 작성자: Jules
@@ -10,8 +10,8 @@
 
 ## 수행한 작업
 - `.orchestrator/src/orchestrator/review_entrypoint.py` 파일 생성 및 `execute_review_handoff_with_repository` 함수 구현.
-- 팩토리를 이용한 지연 호출, 실패 처리, 직접 주입 우선순위(Backward Compatibility) 검증 단위 테스트 추가 (`.orchestrator/tests/test_review_entrypoint.py`).
-- 기존 단위 테스트 성공 확인 및 `__init__.py` Export 갱신.
+- 팩토리를 이용한 지연 호출, 실패 처리, 직접 주입 우선순위(하위 호환성) 검증 단위 테스트 추가 (`.orchestrator/tests/test_review_entrypoint.py`).
+- 기존 단위 테스트 성공 확인 및 `__init__.py` 외부 노출(Export) 갱신.
 - Runtime DB 운영 기준(`orchestrator-runtime-db-operations.md`)에 백업·복구 미구성 상태 명시.
 - BL-0005 문서에 '최상위 진입점 통합 준비 완료' 내용 추가 (단, 실제 DB 생성/권한 적용 등 운영 작업은 후속으로 진행해야 하므로 상태는 `제안됨` 유지).
 
