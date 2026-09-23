@@ -28,6 +28,8 @@ Orchestrator는 상태, 컨텍스트, 작업 기록을 유지하기 위해 SQLit
 
 시스템 장애나 데이터 손실 시 Orchestrator 상태 복구를 위해 정기적인 백업 체계가 마련되어야 한다.
 
+**현재 상태**: 백업·복구는 미구성 상태이며, 실제 운영 Runtime DB 설정과 함께 후속 작업(Codex 운영 작업)으로 진행할 예정입니다.
+
 - 백업 대상: Runtime DB가 저장되는 주입 경로 또는 목표 경로의 전체 파일.
 - RPO (Recovery Point Objective) 및 RTO (Recovery Time Objective): 기준 설정 필요.
 - 백업 주기 및 보존 기간: 시스템 운영 요구사항에 맞춰 정의 필요.

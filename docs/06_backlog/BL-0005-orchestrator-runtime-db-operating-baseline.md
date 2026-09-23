@@ -42,3 +42,7 @@ Orchestrator의 상태와 기록을 관리하는 Runtime SQLite DB를 안정적�
 | 2026-09-23 | Jules | 환경 변수(`ORCHESTRATOR_JULES_STATE_DIR`) 도입으로 인한 이관 계획 내용 갱신 |
 | 2026-09-23 | Jules | 상태 저장소 팩토리 생성 및 테스트 연결 준비 완료 상태로 변경 |
 | 2026-09-23 | Jules | review_handoff 내 jules_state_repository_factory 통합 지점 구현 상태로 갱신 |
+
+## 진행 상황 및 업데이트
+
+- **업데이트 일자 (미정)**: 최상위 진입점(execute_review_handoff_with_repository)을 통해 저장소 팩토리를 주입받아 1:1:1 결속 영속화를 지연 실행하는 통합 준비가 완료됨. 실제 운영 DB 생성·쓰기, ubuntu:ubuntu 권한 적용, 백업·복구는 후속 Codex 운영 작업으로 남아 있으므로 '제안됨' 상태를 유지함.
