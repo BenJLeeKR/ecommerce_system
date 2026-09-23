@@ -17,7 +17,9 @@ Orchestrator의 상태와 실행 기록을 영속화하는 Runtime SQLite DB의 
 - **인덱스 업데이트**: Analysis 및 Worklog 인덱스 문서에 본 작업의 산출물을 각각 추가했다.
 
 ## 3. 검증 및 롤백 정책 기록
-- **검증**: 허용된 5개의 파일(`AN-0008`, Analysis 인덱스, `BL-0005`, `WL-0034`, Worklog 인덱스)에 대해서만 변경이 발생했음을 `git diff --check`로 확인하였다.
+- **검증**:
+  - `git diff --check`를 통해 형식 및 공백 오류 등의 유효성(형식 검사)을 점검하였다.
+  - `git status` 및 `git diff --name-only` 등의 별도 변경 파일 목록 검사를 통해, 허용된 5개 경로(`AN-0008`, Analysis 인덱스, `BL-0005`, `WL-0034`, Worklog 인덱스)에 대해서만 변경이 발생했음을 확인하였다.
 - **롤백 기준 (수동)**:
   - 본 PR이 병합되지 않을 경우 PR을 종료(Close)한다.
   - 병합 후 문제가 발견될 경우 해당 merge commit만 `revert`하여 롤백한다. (자동 롤백 및 자동 병합 금지)
