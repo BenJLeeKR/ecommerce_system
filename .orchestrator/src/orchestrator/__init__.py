@@ -58,6 +58,8 @@ from .review_entrypoint import execute_review_handoff_with_repository
 
 from .dispatch_entrypoint import execute_dispatch_session
 
+from .plan_review_reader import read_latest_plan_review, PlanReviewResult
+
 __all__ = [
     "PathItem",
     "TaskContract",
@@ -101,4 +103,6 @@ __all__ = [
     "execute_manual_session_monitor",
     "execute_review_handoff_with_repository",
     "execute_dispatch_session",
+    "read_latest_plan_review",
+    "PlanReviewResult",
 ]

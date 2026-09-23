@@ -174,6 +174,11 @@ class JulesAdapter(ABC):
         """세션을 명시적으로 취소 상태로 전이합니다."""
         pass
 
+    @abstractmethod
+    def get_latest_plan_text(self, session_resource_name: str) -> Optional[str]:
+        """조회 시점에서 가장 최근에 생성된 planGenerated 이벤트의 Plan 원문을 반환합니다."""
+        pass
+
 
 class FakeJulesAdapter(JulesAdapter):
     """결정론적 가짜(Fake) Jules 어댑터.
@@ -444,6 +449,11 @@ class FakeJulesAdapter(JulesAdapter):
             to_status="CANCELLED",
             reason_code=reason_code,
         )
+
+    def get_latest_plan_text(self, session_resource_name: str) -> Optional[str]:
+        if session_resource_name in self._sessions:
+            return "dummy plan text"
+        return None
 
 
 # --- Jules REST API v1alpha 전송 계층 및 실제 어댑터 구현 ---
@@ -1090,3 +1100,69 @@ class RealJulesAdapter(JulesAdapter):
             created_at_utc=now,
             updated_at_utc=now,
         )
+
+    def get_latest_plan_text(self, session_resource_name: str) -> Optional[str]:
+        """GET /sessions/{session_resource_name}/activities 연동 후 가장 최근 planGenerated의 Plan 원문을 추출합니다."""
+        if not self.validate_session_resource_name(session_resource_name):
+            raise TransportError("INVALID_RESPONSE_FORMAT")
+
+        try:
+            res = self._transport.request(
+                method="GET",
+                path=f"{session_resource_name}/activities",
+                headers=self._get_headers(),
+            )
+            if not isinstance(res, dict):
+                raise TransportError("INVALID_RESPONSE_FORMAT")
+
+            raw_activities = res.get("activities", [])
+            if not isinstance(raw_activities, list):
+                return None
+
+            parsed_activities = []
+            is_temporal_order_reliable = True
+
+            for act in raw_activities:
+                if not isinstance(act, dict):
+                    parsed_activities.append((None, act))
+                    is_temporal_order_reliable = False
+                    continue
+
+                create_time_str = act.get("createTime")
+                if not create_time_str or not isinstance(create_time_str, str):
+                    parsed_activities.append((None, act))
+                    is_temporal_order_reliable = False
+                    continue
+
+                try:
+                    dt = datetime.fromisoformat(create_time_str.replace('Z', '+00:00'))
+                    parsed_activities.append((dt, act))
+                except (ValueError, TypeError):
+                    parsed_activities.append((None, act))
+                    is_temporal_order_reliable = False
+
+            if is_temporal_order_reliable:
+                times = [dt for dt, _ in parsed_activities]
+                if len(times) != len(set(times)):
+                    is_temporal_order_reliable = False
+
+            if not is_temporal_order_reliable:
+                return None
+
+            parsed_activities.sort(key=lambda x: x[0])
+
+            # 뒤에서부터 가장 최근 planGenerated 탐색
+            for _, act in reversed(parsed_activities):
+                if not isinstance(act, dict):
+                    continue
+                if "planGenerated" in act:
+                    plan_data = act["planGenerated"]
+                    if isinstance(plan_data, dict) and "plan" in plan_data and isinstance(plan_data["plan"], str):
+                        return plan_data["plan"]
+                    else:
+                        return None
+
+            return None
+
+        except TransportError:
+            raise
