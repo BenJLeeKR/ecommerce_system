@@ -70,11 +70,14 @@ class TestDispatchEntrypoint(unittest.TestCase):
         self.actual_base_sha = "abcd123"
 
     def test_success_path_with_real_adapter(self):
-        """정상 경로에서 RealJulesAdapter를 통해 POST 요청의 startingBranch, requirePlanApproval 필드를 검증."""
+        """정상 경로에서 RealJulesAdapter를 통해 POST 요청의 startingBranch, requirePlanApproval 필드 및 prompt 전달을 검증."""
+        dummy_prompt = "Dummy prompt for testing"
         response = execute_dispatch_session(
             contract=self.contract,
             approval_evidence=self.evidence,
             source_name=self.source_name,
+            prompt=dummy_prompt,
+            is_session_creation_authorized=True,
             jules_adapter=self.jules_adapter,
             actual_base_sha=self.actual_base_sha
         )
@@ -95,29 +98,69 @@ class TestDispatchEntrypoint(unittest.TestCase):
         self.assertEqual(github_context.get("startingBranch"), "main")
         self.assertEqual(source_context.get("source"), self.source_name)
         self.assertTrue(body.get("requirePlanApproval"))
+        self.assertEqual(body.get("prompt"), dummy_prompt)
 
-    def test_approval_not_active(self):
-        """승인 상태가 ACTIVE가 아니면 중단."""
-        self.evidence.status = "WITHDRAWN"
+    def test_task_id_mismatch(self):
+        """Task ID 불일치 시 API 호출 없이 중단."""
+        self.evidence.task_id = "DIFF-TASK-ID"
         response = execute_dispatch_session(
-            self.contract, self.evidence, self.source_name, self.jules_adapter, self.actual_base_sha
+            self.contract, self.evidence, self.source_name, "dummy", True, self.jules_adapter, self.actual_base_sha
         )
         self.assertEqual(response.status, "NEEDS_HUMAN_REVIEW")
-        self.assertEqual(response.reason_code, "APPROVAL_NOT_ACTIVE")
+        self.assertEqual(response.reason_code, "TASK_ID_MISMATCH")
+        self.mock_transport.request.assert_not_called()
+
+    def test_contract_version_mismatch(self):
+        """Contract Version 불일치 시 API 호출 없이 중단."""
+        self.evidence.contract_version = "v2"
+        response = execute_dispatch_session(
+            self.contract, self.evidence, self.source_name, "dummy", True, self.jules_adapter, self.actual_base_sha
+        )
+        self.assertEqual(response.status, "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(response.reason_code, "CONTRACT_VERSION_MISMATCH")
+        self.mock_transport.request.assert_not_called()
+
+    def test_not_authorized(self):
+        """세션 생성 명시적 권한이 없는 경우 API 호출 없이 중단."""
+        response = execute_dispatch_session(
+            self.contract, self.evidence, self.source_name, "dummy", False, self.jules_adapter, self.actual_base_sha
+        )
+        self.assertEqual(response.status, "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(response.reason_code, "SESSION_CREATION_NOT_AUTHORIZED")
+        self.mock_transport.request.assert_not_called()
+
+    def test_invalid_source_name(self):
+        """source_name 검증 실패 시 API 호출 없이 중단."""
+        invalid_source_name = "invalid_name" # 'sources/' 로 시작하지 않음
+        response = execute_dispatch_session(
+            self.contract, self.evidence, invalid_source_name, "dummy", True, self.jules_adapter, self.actual_base_sha
+        )
+        self.assertEqual(response.status, "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(response.reason_code, "INVALID_SOURCE_NAME")
+        self.mock_transport.request.assert_not_called()
+
+    def test_approval_not_active(self):
+        """승인 상태가 ACTIVE가 아니면 중단 (정책 평가 실패)."""
+        self.evidence.status = "WITHDRAWN"
+        response = execute_dispatch_session(
+            self.contract, self.evidence, self.source_name, "dummy", True, self.jules_adapter, self.actual_base_sha
+        )
+        self.assertEqual(response.status, "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(response.reason_code, "DISPATCH_POLICY_VIOLATION")
         self.assertTrue(response.created_at_utc) # UTC 시간 확인
         self.mock_transport.request.assert_not_called()
 
     def test_auto_merge_not_allowed(self):
-        """auto_merge가 True이면 중단."""
+        """auto_merge가 True이면 중단 (정책 평가 실패)."""
         self.contract.auto_merge = True
 
         _, self.evidence.contract_hash = canonicalize_contract(self.contract) # 해시 불일치를 막기 위해 갱신
 
         response = execute_dispatch_session(
-            self.contract, self.evidence, self.source_name, self.jules_adapter, self.actual_base_sha
+            self.contract, self.evidence, self.source_name, "dummy", True, self.jules_adapter, self.actual_base_sha
         )
         self.assertEqual(response.status, "NEEDS_HUMAN_REVIEW")
-        self.assertEqual(response.reason_code, "AUTO_MERGE_NOT_ALLOWED")
+        self.assertEqual(response.reason_code, "DISPATCH_POLICY_VIOLATION")
         self.mock_transport.request.assert_not_called()
 
     def test_plan_approval_not_required(self):
@@ -127,7 +170,7 @@ class TestDispatchEntrypoint(unittest.TestCase):
         _, self.evidence.contract_hash = canonicalize_contract(self.contract) # 해시 불일치를 막기 위해 갱신
 
         response = execute_dispatch_session(
-            self.contract, self.evidence, self.source_name, self.jules_adapter, self.actual_base_sha
+            self.contract, self.evidence, self.source_name, "dummy", True, self.jules_adapter, self.actual_base_sha
         )
         self.assertEqual(response.status, "NEEDS_HUMAN_REVIEW")
         self.assertEqual(response.reason_code, "PLAN_APPROVAL_REQUIRED")
@@ -137,7 +180,7 @@ class TestDispatchEntrypoint(unittest.TestCase):
         """contract hash 불일치 시 중단."""
         self.evidence.contract_hash = "fake-hash"
         response = execute_dispatch_session(
-            self.contract, self.evidence, self.source_name, self.jules_adapter, self.actual_base_sha
+            self.contract, self.evidence, self.source_name, "dummy", True, self.jules_adapter, self.actual_base_sha
         )
         self.assertEqual(response.status, "NEEDS_HUMAN_REVIEW")
         self.assertEqual(response.reason_code, "CONTRACT_HASH_MISMATCH")
@@ -147,7 +190,7 @@ class TestDispatchEntrypoint(unittest.TestCase):
         """approved scope hash 불일치 시 중단."""
         self.evidence.approved_scope_hash = "fake-hash"
         response = execute_dispatch_session(
-            self.contract, self.evidence, self.source_name, self.jules_adapter, self.actual_base_sha
+            self.contract, self.evidence, self.source_name, "dummy", True, self.jules_adapter, self.actual_base_sha
         )
         self.assertEqual(response.status, "NEEDS_HUMAN_REVIEW")
         self.assertEqual(response.reason_code, "SCOPE_HASH_MISMATCH")
@@ -156,7 +199,7 @@ class TestDispatchEntrypoint(unittest.TestCase):
     def test_base_sha_mismatch(self):
         """기준 SHA 불일치 시 중단."""
         response = execute_dispatch_session(
-            self.contract, self.evidence, self.source_name, self.jules_adapter, actual_base_sha="diff-sha"
+            self.contract, self.evidence, self.source_name, "dummy", True, self.jules_adapter, actual_base_sha="diff-sha"
         )
         self.assertEqual(response.status, "NEEDS_HUMAN_REVIEW")
         self.assertEqual(response.reason_code, "BASE_SHA_MISMATCH")
@@ -167,10 +210,22 @@ class TestDispatchEntrypoint(unittest.TestCase):
         # 잘못된 경로 포맷 주입 (절대 경로)
         self.contract.allowed_paths = [PathItem(path="/invalid/path", kind="file")]
         response = execute_dispatch_session(
-            self.contract, self.evidence, self.source_name, self.jules_adapter, self.actual_base_sha
+            self.contract, self.evidence, self.source_name, "dummy", True, self.jules_adapter, self.actual_base_sha
         )
         self.assertEqual(response.status, "NEEDS_HUMAN_REVIEW")
         self.assertEqual(response.reason_code, "SCOPE_CANONICALIZATION_FAILED")
+        self.mock_transport.request.assert_not_called()
+
+    def test_dispatch_policy_violation(self):
+        """동적 정책 평가(위험도 MEDIUM 등) 실패 시 API 호출 없이 중단."""
+        self.contract.risk_level = "MEDIUM"
+        _, self.evidence.contract_hash = canonicalize_contract(self.contract)
+
+        response = execute_dispatch_session(
+            self.contract, self.evidence, self.source_name, "dummy", True, self.jules_adapter, self.actual_base_sha
+        )
+        self.assertEqual(response.status, "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(response.reason_code, "DISPATCH_POLICY_VIOLATION")
         self.mock_transport.request.assert_not_called()
 
 if __name__ == '__main__':

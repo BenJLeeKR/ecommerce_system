@@ -9,12 +9,15 @@ from typing import Any, Optional, Dict, Tuple
 from datetime import datetime, timezone
 from .models import TaskContract, ApprovalEvidence, PathItem
 from .canonicalization import canonicalize_contract, canonicalize_scope, ScopeCanonicalizationError
-from .jules_adapter import JulesSessionRequest, JulesSessionResponse, PreGateResult
+from .jules_adapter import JulesSessionRequest, JulesSessionResponse, PreGateResult, validate_source_name
+from .policy import evaluate_dispatch_policy
 
 def execute_dispatch_session(
     contract: TaskContract,
     approval_evidence: ApprovalEvidence,
     source_name: str,
+    prompt: str,
+    is_session_creation_authorized: bool,
     jules_adapter: Any,
     actual_base_sha: str
 ) -> JulesSessionResponse:
@@ -37,13 +40,21 @@ def execute_dispatch_session(
         updated_at_utc=now
     )
 
-    # 사전 검증 1: 승인 상태 및 정책
-    if approval_evidence.status != "ACTIVE":
-        error_response.reason_code = "APPROVAL_NOT_ACTIVE"
+    # 사전 검증 1: task_id 및 contract_version 대조, 명시적 권한 및 source_name 검증
+    if contract.task_id != approval_evidence.task_id:
+        error_response.reason_code = "TASK_ID_MISMATCH"
         return error_response
 
-    if contract.auto_merge:
-        error_response.reason_code = "AUTO_MERGE_NOT_ALLOWED"
+    if contract.contract_version != approval_evidence.contract_version:
+        error_response.reason_code = "CONTRACT_VERSION_MISMATCH"
+        return error_response
+
+    if not is_session_creation_authorized:
+        error_response.reason_code = "SESSION_CREATION_NOT_AUTHORIZED"
+        return error_response
+
+    if not validate_source_name(source_name):
+        error_response.reason_code = "INVALID_SOURCE_NAME"
         return error_response
 
     if not contract.plan_approval_required:
@@ -66,7 +77,16 @@ def execute_dispatch_session(
         error_response.reason_code = "SCOPE_HASH_MISMATCH"
         return error_response
 
-    # 사전 검증 3: 기준 SHA 대조
+    # 사전 검증 3: 동적 정책 평가 (evaluate_dispatch_policy)
+    is_eligible, reasons = evaluate_dispatch_policy(
+        contract, calculated_contract_hash, calculated_scope_hash, approval_evidence
+    )
+    if not is_eligible:
+        # 정책 실패 사유가 여러 개일 수 있으나 첫 번째 주요 원인(또는 정책 거부 코드)을 할당
+        error_response.reason_code = "DISPATCH_POLICY_VIOLATION"
+        return error_response
+
+    # 사전 검증 4: 기준 SHA 대조
     if contract.base_commit_sha != actual_base_sha:
         error_response.reason_code = "BASE_SHA_MISMATCH"
         return error_response
@@ -81,14 +101,14 @@ def execute_dispatch_session(
         allowed_paths=contract.allowed_paths,
         forbidden_paths=contract.forbidden_paths,
         source_name=source_name,
-        prompt=""
+        prompt=prompt
     )
 
     # 검증 통과 기록을 PreGateResult로 구성하여 실제 어댑터에 전달
     pre_gate_result = PreGateResult(
         is_valid=True,
-        is_dispatch_eligible=True,
-        is_session_creation_authorized=True,
+        is_dispatch_eligible=is_eligible,
+        is_session_creation_authorized=is_session_creation_authorized,
         status="APPROVED",
         task_id=contract.task_id,
         contract_hash=calculated_contract_hash,
