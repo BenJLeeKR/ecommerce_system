@@ -14,7 +14,7 @@ Orchestrator는 상태, 컨텍스트, 작업 기록을 유지하기 위해 SQLit
 
 ## 3. 상태 저장소 및 진입점 통합 지점
 
-- **Dispatch 진입점 의존성 주입 및 미접근 경계**: `execute_dispatch_session` 호출 시 `source_name` 및 어댑터가 명시적으로 주입되며, 사전 검증을 통해 유효한 TaskContract와 ApprovalEvidence만 세션으로 인계한다. 이 단계에서는 실제 API 호출이나 외부 Runtime DB 접근을 원천적으로 차단하여 안전 경계를 유지한다.
+- **Dispatch 진입점 의존성 주입 및 미접근 경계**: `execute_dispatch_session` 호출 시 `source_name` 및 어댑터가 명시적으로 주입되며, 사전 검증을 통해 유효한 TaskContract와 ApprovalEvidence만 세션으로 인계한다. 검증 실패 시 API 및 외부 DB 호출을 원천 차단하며, 성공한 명시적 런타임 호출에 한해 API 접근을 허용하고 실제 결속 기록(외부 DB 쓰기)은 후속 Task로 분리하여 안전 경계를 유지한다.
 - **Jules 검토 인계 과정의 의존성 주입**: 완료된 작업의 1:1:1 결속(PersistentSessionBinding) 영속화는 `execute_review_handoff` 호출 시 외부에서 주입된 저장소 팩토리(`jules_state_repository_factory`)를 통해 이루어진다.
   - (현재 인계 시 실제 1:1:1 결속 데이터는 미기록 상태로 남아 있으며, Dispatch 단계 이후 후속 실제 결속 기록 단계에서 활성화될 예정이다.)
 - **지연 초기화 및 우선순위**: 팩토리는 검증이 완료되어 상태가 `RESULT_COLLECTED`로 판정된 이후에만 지연 호출된다. 테스트나 기존 구현에 의해 `repository` 인스턴스가 직접 주입된 경우, 직접 주입된 인스턴스가 팩토리보다 우선하며 팩토리는 호출되지 않는다.

@@ -6,9 +6,10 @@ TaskContract 및 ApprovalEvidence에서 canonical scope hash 등을 정규화하
 """
 
 from typing import Any, Optional, Dict, Tuple
+from datetime import datetime, timezone
 from .models import TaskContract, ApprovalEvidence, PathItem
 from .canonicalization import canonicalize_contract, canonicalize_scope, ScopeCanonicalizationError
-from .jules_adapter import JulesSessionRequest, JulesSessionResponse
+from .jules_adapter import JulesSessionRequest, JulesSessionResponse, PreGateResult
 
 def execute_dispatch_session(
     contract: TaskContract,
@@ -24,6 +25,7 @@ def execute_dispatch_session(
 
     주의: source_name은 JulesSessionRequest 구성에만 전달되며 기록되지 않습니다.
     """
+    now = datetime.now(timezone.utc).isoformat()
     error_response = JulesSessionResponse(
         session_id="",
         task_id=contract.task_id,
@@ -31,8 +33,8 @@ def execute_dispatch_session(
         pr_number=None,
         status="NEEDS_HUMAN_REVIEW",
         reason_code="PRE_DISPATCH_VALIDATION_FAILED",
-        created_at_utc="",  # 실제 어댑터에서는 now를 쓰지만 여기서는 에러용 빈값 또는 모의값
-        updated_at_utc=""
+        created_at_utc=now,
+        updated_at_utc=now
     )
 
     # 사전 검증 1: 승인 상태 및 정책
@@ -50,9 +52,9 @@ def execute_dispatch_session(
 
     # 사전 검증 2: 해시 정규화 및 대조
     try:
-        calculated_contract_hash = canonicalize_contract(contract)
-        calculated_scope_hash = canonicalize_scope(contract.allowed_paths, contract.forbidden_paths)
-    except ScopeCanonicalizationError:
+        _, calculated_contract_hash = canonicalize_contract(contract)
+        _, calculated_scope_hash = canonicalize_scope(contract.allowed_paths, contract.forbidden_paths)
+    except (ScopeCanonicalizationError, TypeError, ValueError, AttributeError):
         error_response.reason_code = "SCOPE_CANONICALIZATION_FAILED"
         return error_response
 
@@ -82,10 +84,22 @@ def execute_dispatch_session(
         prompt=""
     )
 
-    # RealJulesAdapter 또는 Mock Adapter를 통한 호출
-    # 시작 브랜치는 main, planApprovalRequired는 True로 강제/보존됨을 가정
+    # 검증 통과 기록을 PreGateResult로 구성하여 실제 어댑터에 전달
+    pre_gate_result = PreGateResult(
+        is_valid=True,
+        is_dispatch_eligible=True,
+        is_session_creation_authorized=True,
+        status="APPROVED",
+        task_id=contract.task_id,
+        contract_hash=calculated_contract_hash,
+        approved_scope_hash=calculated_scope_hash,
+        idempotency_key=contract.idempotency_key,
+        base_sha=contract.base_commit_sha
+    )
+
+    # 어댑터 호출: main 브랜치 시작 및 planApprovalRequired=True 정책은
+    # RealJulesAdapter 내부에서 HTTP 요청 생성 시 강제/보존됨
     return jules_adapter.create_session(
         request=request,
-        start_branch_name="main",
-        plan_approval_required=True
+        pre_gate_result=pre_gate_result
     )
