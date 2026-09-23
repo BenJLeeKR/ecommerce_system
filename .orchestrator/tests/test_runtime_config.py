@@ -9,7 +9,9 @@ from orchestrator.runtime_config import (
     get_default_env_file_path,
     load_jules_runtime_config,
     load_orchestrator_jules_state_dir,
+    get_jules_state_repository,
 )
+from orchestrator.repository import StateRepository
 
 
 class TestJulesRuntimeConfig(unittest.TestCase):
@@ -103,3 +105,47 @@ class TestJulesRuntimeConfig(unittest.TestCase):
             load_orchestrator_jules_state_dir(env_path)
 
         self.assertIn("Git 리포지토리 외부 경로여야 합니다", str(raised.exception))
+
+    def test_get_jules_state_repository_success(self) -> None:
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        target_path = Path(temp_dir.name) / "test-state-dir"
+
+        env_path = self._write_env(f"ORCHESTRATOR_JULES_STATE_DIR={target_path}\n")
+
+        repo = get_jules_state_repository(env_path)
+
+        self.assertIsInstance(repo, StateRepository)
+        self.assertEqual(repo.db_path.name, "jules_orchestrator_state.db")
+        self.assertEqual(repo.db_path.parent, target_path)
+        self.assertTrue(target_path.exists()) # StateRepository initialization creates directory and db
+
+    def test_get_jules_state_repository_rejects_relative_path(self) -> None:
+        env_path = self._write_env("ORCHESTRATOR_JULES_STATE_DIR=relative/path\n")
+
+        with self.assertRaises(RuntimeConfigError) as raised:
+            get_jules_state_repository(env_path)
+
+        self.assertIn("절대 경로", str(raised.exception))
+
+    def test_get_jules_state_repository_rejects_repo_internal_path(self) -> None:
+        repo_root = get_default_env_file_path().parent.parent.resolve()
+        test_path = repo_root / ".orchestrator" / "test-dir"
+
+        env_path = self._write_env(f"ORCHESTRATOR_JULES_STATE_DIR={test_path}\n")
+
+        with self.assertRaises(RuntimeConfigError) as raised:
+            get_jules_state_repository(env_path)
+
+        self.assertIn("Git 리포지토리 외부 경로여야 합니다", str(raised.exception))
+
+    def test_explicit_repository_injection_is_preserved(self) -> None:
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        db_path = Path(temp_dir.name) / "explicit_state.db"
+
+        repo = StateRepository(db_path)
+
+        self.assertIsInstance(repo, StateRepository)
+        self.assertEqual(repo.db_path, db_path)
+        self.assertTrue(db_path.parent.exists())

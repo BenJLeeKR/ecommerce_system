@@ -95,6 +95,23 @@ def load_orchestrator_jules_state_dir(
     return state_dir
 
 
+def get_jules_state_repository(
+    env_file: Optional[Union[str, Path]] = None,
+) -> "StateRepository":
+    """Jules 전용 상태 저장소 팩토리.
+
+    환경 변수 `ORCHESTRATOR_JULES_STATE_DIR` 경로에 `jules_orchestrator_state.db`를 연결하여
+    StateRepository 인스턴스를 반환한다.
+    실제 호출 시에만 디렉터리와 DB 초기화를 시도한다.
+    """
+    from .repository import StateRepository
+
+    state_dir = load_orchestrator_jules_state_dir(env_file)
+    db_path = state_dir / "jules_orchestrator_state.db"
+
+    return StateRepository(db_path)
+
+
 def load_jules_runtime_config(
     env_file: Optional[Union[str, Path]] = None,
 ) -> JulesRuntimeConfig:

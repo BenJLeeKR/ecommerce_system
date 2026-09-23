@@ -42,6 +42,7 @@ from .runtime_config import (
     load_jules_api_key,
     load_jules_runtime_config,
     load_orchestrator_jules_state_dir,
+    get_jules_state_repository,
 )
 
 from .result_package import generate_result_package
@@ -89,6 +90,7 @@ __all__ = [
     "load_jules_api_key",
     "load_jules_runtime_config",
     "load_orchestrator_jules_state_dir",
+    "get_jules_state_repository",
     "generate_result_package",
     "CodexNotificationAdapter",
     "execute_review_handoff",
