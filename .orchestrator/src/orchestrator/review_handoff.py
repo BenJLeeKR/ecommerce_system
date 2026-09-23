@@ -6,7 +6,7 @@ Jules 작업 완료 감지, 1:1:1 바인딩 재확인, Scope Lock 재검증을 �
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Any, Dict
+from typing import List, Optional, Any, Dict, Callable
 from datetime import datetime, timezone
 
 from .models import (
@@ -51,6 +51,7 @@ def execute_review_handoff(
     jules_adapter: Any,  # RealJulesAdapter 또는 Test Double
     codex_adapter: CodexNotificationAdapter,
     repository: Optional[StateRepository] = None,
+    jules_state_repository_factory: Optional[Callable[[], StateRepository]] = None,
     verified_session: Optional[JulesSessionResponse] = None,
 ) -> StateTransition:
     """Jules 완료 감지부터 검토 인계까지의 흐름을 실행합니다.
@@ -152,7 +153,23 @@ def execute_review_handoff(
 
     # 5. 판정, 영속 결속 및 상태 전이 반환
     if result_package.status == "RESULT_COLLECTED":
-        if repository is not None:
+        active_repo = repository
+
+        if active_repo is None and jules_state_repository_factory is not None:
+            try:
+                active_repo = jules_state_repository_factory()
+            except Exception:
+                return StateTransition(
+                    transition_id=f"trans-{_now_utc_iso()}",
+                    task_id=task_id,
+                    from_status="COMPLETED",
+                    to_status="NEEDS_HUMAN_REVIEW",
+                    transition_agent=transition_agent,
+                    recorded_at_utc=now_utc,
+                    reason="FACTORY_INIT_ERROR"
+                )
+
+        if active_repo is not None:
             # PR 번호 변환 시도
             try:
                 if isinstance(pr_identifier, int):
@@ -189,7 +206,7 @@ def execute_review_handoff(
             )
 
             try:
-                repository.save_persistent_session_binding(binding)
+                active_repo.save_persistent_session_binding(binding)
             except RepositoryBindingConflictError:
                 # 결속 충돌 시 무저장·무알림 원칙(NEEDS_HUMAN_REVIEW 전이 반환만)
                 return StateTransition(

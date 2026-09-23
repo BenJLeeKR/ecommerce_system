@@ -32,3 +32,4 @@
 - [WL-0028-2026-09-22-orchestrator-runtime-db-operating-baseline](WL-0028-2026-09-22-orchestrator-runtime-db-operating-baseline.md) — Orchestrator Runtime DB 저장 원칙 및 미결 백업·복구 기준 문서화 완료 기록.
 - [WL-0029-2026-09-23-orchestrator-jules-state-dir](WL-0029-2026-09-23-orchestrator-jules-state-dir.md) — Orchestrator 상태 디렉터리 경로 환경 변수 로더 추가 및 외부 경로 검증 로직 구현.
 - [WL-0030-2026-09-23-orchestrator-repository-integration](WL-0030-2026-09-23-orchestrator-repository-integration.md) — Orchestrator 상태 저장소 연동 팩토리 구현 및 테스트 환경 구성 완료 기록.
+- [WL-0031-2026-09-23-orchestrator-runtime-binding-injection](WL-0031-2026-09-23-orchestrator-runtime-binding-injection.md) — Orchestrator 완료 검토 인계 과정에 상태 저장소 팩토리 주입 지점 구현.
