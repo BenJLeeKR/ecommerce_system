@@ -8,13 +8,14 @@ Orchestrator는 상태, 컨텍스트, 작업 기록을 유지하기 위해 SQLit
 
 ## 2. 외부 저장 원칙 및 경로
 
-- **현재 상태**: SQLite DB 경로는 코드 내에 고정되지 않고, 명시적인 호출자(Caller) 주입(Injection) 방식을 유지한다. `ORCHESTRATOR_JULES_STATE_DIR` 환경 변수를 이용한 검증과 Jules 전용 상태 저장소 팩토리(`get_jules_state_repository`)가 `execute_review_handoff_with_repository` 진입점에 통합 완료되었다. 실제 운영 환경용 Runtime DB 초기화 및 권한 적용은 후속 Codex 운영 작업으로 진행된다.
-- **목표 상태 (이관 대상)**: 운영 환경에서의 안정성을 위해 최종적으로 `ORCHESTRATOR_JULES_STATE_DIR` 환경 변수가 가리키는 외부 경로로 이관 및 설정할 예정이다. 향후 별도의 승인과 운영 작업을 거쳐 실제 `.env` 및 디렉터리/DB 환경을 구성하게 된다.
+- **현재 상태**: SQLite DB 경로는 코드 내에 고정되지 않고, 명시적인 호출자(Caller) 주입(Injection) 방식을 유지한다. `ORCHESTRATOR_JULES_STATE_DIR` 환경 변수를 이용한 검증과 Jules 전용 상태 저장소 팩토리(`get_jules_state_repository`)가 `execute_review_handoff_with_repository` 진입점에 통합 완료되었다.
+  - 외부 상태 디렉터리 확인 및 최소 권한 적용, 빈 초기 SQLite DB 초기화가 완료되었다.
 - **Git 통제**: 상태 디렉터리와 내부 DB 파일은 절대 Git 리포지토리에 커밋되지 않아야 하며, Git 작업 트리 외부에 존재해야 한다.
 
 ## 3. 상태 저장소 인계 통합 지점
 
 - **Jules 검토 인계 과정의 의존성 주입**: 완료된 작업의 1:1:1 결속(PersistentSessionBinding) 영속화는 `execute_review_handoff` 호출 시 외부에서 주입된 저장소 팩토리(`jules_state_repository_factory`)를 통해 이루어진다.
+  - (현재 인계 시 실제 1:1:1 결속 데이터는 미기록 상태로 남아 있다.)
 - **지연 초기화 및 우선순위**: 팩토리는 검증이 완료되어 상태가 `RESULT_COLLECTED`로 판정된 이후에만 지연 호출된다. 테스트나 기존 구현에 의해 `repository` 인스턴스가 직접 주입된 경우, 직접 주입된 인스턴스가 팩토리보다 우선하며 팩토리는 호출되지 않는다.
 - **하위 호환성 유지**: 직접 주입된 저장소와 팩토리가 모두 없는 경우에는 기존과 동일하게 영속화 단계를 건너뛰고 정상적으로 검토 인계가 진행된다.
 - **오류 처리 방침**: 팩토리를 통한 저장소 초기화 과정에서 예외가 발생하거나 결속 데이터 저장에 실패하는 경우, 원시 예외를 노출하거나 알림을 보내지 않고 무저장 상태로 즉시 `NEEDS_HUMAN_REVIEW` 전이를 반환한다.
@@ -22,17 +23,17 @@ Orchestrator는 상태, 컨텍스트, 작업 기록을 유지하기 위해 SQLit
 ## 4. 접근 권한 기준
 
 - DB 파일 및 저장 디렉터리는 최소 권한 원칙을 준수하여 구성해야 한다.
-- 향후 이관될 `ORCHESTRATOR_JULES_STATE_DIR` 디렉터리 및 내부의 SQLite DB 파일은 지정된 실행 계정(`ubuntu:ubuntu`)만이 읽기 및 쓰기 권한을 가지도록 제한한다.
+- `ORCHESTRATOR_JULES_STATE_DIR` 디렉터리 및 내부의 SQLite DB 파일은 지정된 실행 계정(`ubuntu:ubuntu`)만이 읽기 및 쓰기 권한을 가지도록 적용 완료되었다.
 
 ## 5. 백업 및 복구 기준
 
 시스템 장애나 데이터 손실 시 Orchestrator 상태 복구를 위해 정기적인 백업 체계가 마련되어야 한다.
 
-**현재 상태**: 백업·복구는 미구성 상태이며, 실제 운영 Runtime DB 설정과 함께 후속 작업(Codex 운영 작업)으로 진행할 예정입니다.
+**현재 상태**: 백업·복구는 미구성 상태이며, RPO(Recovery Point Objective) 및 RTO(Recovery Time Objective) 또한 미결 상태이다. 실제 운영에 필요한 백업 기준 수립은 여전히 후속 결정 사항으로 남아있다.
 
 - 백업 대상: Runtime DB가 저장되는 주입 경로 또는 목표 경로의 전체 파일.
-- RPO (Recovery Point Objective) 및 RTO (Recovery Time Objective): 기준 설정 필요.
-- 백업 주기 및 보존 기간: 시스템 운영 요구사항에 맞춰 정의 필요.
+- RPO 및 RTO: 기준 설정 필요 (미결).
+- 백업 주기 및 보존 기간: 시스템 운영 요구사항에 맞춰 정의 필요 (미결).
 
 ## 6. 보안 및 기록 제한
 
@@ -42,12 +43,13 @@ Orchestrator는 상태, 컨텍스트, 작업 기록을 유지하기 위해 SQLit
 - 원시 프롬프트 내용
 - 원시 활동 로그, 원시 시스템 로그
 - SQLite DB 파일 그 자체 및 덤프 내용
+- 실제 경로 및 DB 파일명/내용
 
 ## 7. 미결 결정 사항 (사용자 확인 필요)
 
-본 문서에서 정의된 원칙을 실제 환경에 적용하기 위해서는 다음 사항들에 대한 사용자의 명시적 결정과 백로그 등록이 필요하다:
-- **실제 운영 적용 시점**: 실제 DB 생성 및 환경 변수 설정 등 후속 Codex 운영 작업 시기.
+본 문서에서 정의된 원칙을 실제 환경에 적용하기 위해서는 다음 사항들에 대한 사용자의 명시적 결정과 백로그 등록이 지속적으로 필요하다:
 - **백업 정책 세부사항**: 백업 실행 주기, 데이터 보존 기간.
 - **복구 목표**: RPO 및 RTO 시간 목표.
+- **실제 1:1:1 결속 데이터 기록 활성화 방안**.
 
 해당 결정 사항들은 Backlog 항목으로 관리된다.
