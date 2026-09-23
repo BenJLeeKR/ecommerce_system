@@ -54,6 +54,8 @@ from .review_handoff import (
 
 from .manual_entrypoint import execute_manual_session_monitor
 
+from .review_entrypoint import execute_review_handoff_with_repository
+
 __all__ = [
     "PathItem",
     "TaskContract",
@@ -95,4 +97,5 @@ __all__ = [
     "CodexNotificationAdapter",
     "execute_review_handoff",
     "execute_manual_session_monitor",
+    "execute_review_handoff_with_repository",
 ]
