@@ -18,6 +18,12 @@ from orchestrator.jules_adapter import (
 )
 
 
+from orchestrator.models import PathItem
+
+
+SAMPLE_ALLOWED_PATHS = [PathItem(path="src/main", kind="directory_recursive")]
+SAMPLE_FORBIDDEN_PATHS = [PathItem(path="src/main/secret", kind="directory_recursive")]
+
 class MockJulesHttpTransport(JulesHttpTransport):
     """가짜/목 HTTP 전송 계층 (외부 네트워크 접속 없음)."""
 
@@ -56,9 +62,11 @@ class TestJulesSessionRequestPromptMasking(unittest.TestCase):
         req = JulesSessionRequest(
             task_id="TEST-TASK-001",
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
-            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            approved_scope_hash="53215c72aacaba4c01f67e3c60da49dee4e7289674168a269034b7fc4c587111",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
             base_sha="7f782c0a6ab295bb9db4d45971dc0d74c7e247e9",
+            allowed_paths=SAMPLE_ALLOWED_PATHS,
+            forbidden_paths=SAMPLE_FORBIDDEN_PATHS,
             source_name=secret_source,
             prompt=secret_prompt,
         )
@@ -149,6 +157,70 @@ class TestValidateSourceName(unittest.TestCase):
 
 
 class TestFakeJulesAdapter(unittest.TestCase):
+    def test_create_session_scope_canonicalization_failed(self):
+        adapter = FakeJulesAdapter()
+        # Invalid paths to cause ScopeCanonicalizationError
+        invalid_paths = [PathItem(path="/absolute/path", kind="file")]
+
+        req = JulesSessionRequest(
+            task_id="TSK-111",
+            contract_hash="hash_c",
+            approved_scope_hash="53215c72aacaba4c01f67e3c60da49dee4e7289674168a269034b7fc4c587111",
+            idempotency_key="idemp_1",
+            base_sha="sha_base",
+            allowed_paths=invalid_paths,
+            forbidden_paths=SAMPLE_FORBIDDEN_PATHS,
+            source_name="sources/github/owner/repo"
+        )
+
+        gate_res = PreGateResult(
+            is_valid=True,
+            is_dispatch_eligible=False,
+            is_session_creation_authorized=True,
+            status="APPROVED",
+            task_id="TSK-111",
+            contract_hash="hash_c",
+            approved_scope_hash="53215c72aacaba4c01f67e3c60da49dee4e7289674168a269034b7fc4c587111",
+            idempotency_key="idemp_1",
+            base_sha="sha_base",
+        )
+
+        resp = adapter.create_session(req, gate_res)
+        self.assertEqual(resp.status, "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(resp.reason_code, "SCOPE_LOCK_CANONICALIZATION_FAILED")
+        self.assertEqual(adapter._session_counter, 0)
+
+    def test_create_session_scope_hash_mismatch(self):
+        adapter = FakeJulesAdapter()
+
+        req = JulesSessionRequest(
+            task_id="TSK-111",
+            contract_hash="hash_c",
+            approved_scope_hash="hash_s_wrong", # mismatched hash
+            idempotency_key="idemp_1",
+            base_sha="sha_base",
+            allowed_paths=SAMPLE_ALLOWED_PATHS,
+            forbidden_paths=SAMPLE_FORBIDDEN_PATHS,
+            source_name="sources/github/owner/repo"
+        )
+
+        gate_res = PreGateResult(
+            is_valid=True,
+            is_dispatch_eligible=False,
+            is_session_creation_authorized=True,
+            status="APPROVED",
+            task_id="TSK-111",
+            contract_hash="hash_c",
+            approved_scope_hash="hash_s_wrong",
+            idempotency_key="idemp_1",
+            base_sha="sha_base",
+        )
+
+        resp = adapter.create_session(req, gate_res)
+        self.assertEqual(resp.status, "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(resp.reason_code, "SCOPE_HASH_MISMATCH")
+        self.assertEqual(adapter._session_counter, 0)
+
     """FakeJulesAdapter 기능 테스트 모음."""
 
     def setUp(self) -> None:
@@ -165,16 +237,18 @@ class TestFakeJulesAdapter(unittest.TestCase):
             status="APPROVED",
             task_id="TEST-TASK-001",
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
-            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            approved_scope_hash="53215c72aacaba4c01f67e3c60da49dee4e7289674168a269034b7fc4c587111",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
             base_sha=self.base_sha,
         )
         self.valid_request = JulesSessionRequest(
             task_id="TEST-TASK-001",
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
-            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            approved_scope_hash="53215c72aacaba4c01f67e3c60da49dee4e7289674168a269034b7fc4c587111",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
             base_sha=self.base_sha,
+            allowed_paths=SAMPLE_ALLOWED_PATHS,
+            forbidden_paths=SAMPLE_FORBIDDEN_PATHS,
             source_name="sources/github/test-owner/test-repository",
             prompt="테스트 프롬프트",
         )
@@ -213,9 +287,11 @@ class TestFakeJulesAdapter(unittest.TestCase):
                 req = JulesSessionRequest(
                     task_id="TEST-TASK-001",
                     contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
-                    approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+                    approved_scope_hash="53215c72aacaba4c01f67e3c60da49dee4e7289674168a269034b7fc4c587111",
                     idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
                     base_sha=self.base_sha,
+            allowed_paths=SAMPLE_ALLOWED_PATHS,
+            forbidden_paths=SAMPLE_FORBIDDEN_PATHS,
                     source_name=bad_src,
                 )
                 res = self.adapter.create_session(req, self.valid_pre_gate)
@@ -231,7 +307,7 @@ class TestFakeJulesAdapter(unittest.TestCase):
             status="APPROVED",
             task_id="TEST-TASK-001",
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
-            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            approved_scope_hash="53215c72aacaba4c01f67e3c60da49dee4e7289674168a269034b7fc4c587111",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
             base_sha=self.base_sha,
         )
@@ -250,7 +326,7 @@ class TestFakeJulesAdapter(unittest.TestCase):
                     status=non_approved_status,
                     task_id="TEST-TASK-001",
                     contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
-                    approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+                    approved_scope_hash="53215c72aacaba4c01f67e3c60da49dee4e7289674168a269034b7fc4c587111",
                     idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
                     base_sha=self.base_sha,
                 )
@@ -267,7 +343,7 @@ class TestFakeJulesAdapter(unittest.TestCase):
             status="NEEDS_HUMAN_REVIEW",
             task_id="TEST-TASK-001",
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
-            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            approved_scope_hash="53215c72aacaba4c01f67e3c60da49dee4e7289674168a269034b7fc4c587111",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
             base_sha=self.base_sha,
         )
@@ -312,7 +388,7 @@ class TestFakeJulesAdapter(unittest.TestCase):
             status="NEEDS_HUMAN_REVIEW",
             task_id="TEST-TASK-001",
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
-            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            approved_scope_hash="53215c72aacaba4c01f67e3c60da49dee4e7289674168a269034b7fc4c587111",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
             base_sha=self.base_sha,
         )
@@ -326,9 +402,11 @@ class TestFakeJulesAdapter(unittest.TestCase):
         bad_request = JulesSessionRequest(
             task_id="TEST-TASK-001",
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
-            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            approved_scope_hash="53215c72aacaba4c01f67e3c60da49dee4e7289674168a269034b7fc4c587111",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
             base_sha="badbadbadbadbadbadbadbadbadbadbadbadbadb",
+            allowed_paths=SAMPLE_ALLOWED_PATHS,
+            forbidden_paths=SAMPLE_FORBIDDEN_PATHS,
             source_name="sources/github/owner/repo",
         )
         # Contract의 SHA도 요청과 같게 맞춤 (그래야 Contract 불일치가 아닌 원격 불일치로 통과)
@@ -339,7 +417,7 @@ class TestFakeJulesAdapter(unittest.TestCase):
             status="APPROVED",
             task_id="TEST-TASK-001",
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
-            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            approved_scope_hash="53215c72aacaba4c01f67e3c60da49dee4e7289674168a269034b7fc4c587111",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
             base_sha="badbadbadbadbadbadbadbadbadbadbadbadbadb",
         )
@@ -352,9 +430,11 @@ class TestFakeJulesAdapter(unittest.TestCase):
         mismatched_request = JulesSessionRequest(
             task_id="TEST-TASK-001",
             contract_hash="9999999999999999999999999999999999999999999999999999999999999999",
-            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            approved_scope_hash="53215c72aacaba4c01f67e3c60da49dee4e7289674168a269034b7fc4c587111",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
             base_sha=self.base_sha,
+            allowed_paths=SAMPLE_ALLOWED_PATHS,
+            forbidden_paths=SAMPLE_FORBIDDEN_PATHS,
             source_name="sources/src-test-001",
         )
         res = self.adapter.create_session(mismatched_request, self.valid_pre_gate)
@@ -370,9 +450,11 @@ class TestFakeJulesAdapter(unittest.TestCase):
         dup_request = JulesSessionRequest(
             task_id="TEST-TASK-001",
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
-            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            approved_scope_hash="53215c72aacaba4c01f67e3c60da49dee4e7289674168a269034b7fc4c587111",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
             base_sha=self.base_sha,
+            allowed_paths=SAMPLE_ALLOWED_PATHS,
+            forbidden_paths=SAMPLE_FORBIDDEN_PATHS,
             source_name="sources/src-test-001",
         )
         dup_pre_gate = PreGateResult(
@@ -382,7 +464,7 @@ class TestFakeJulesAdapter(unittest.TestCase):
             status="APPROVED",
             task_id="TEST-TASK-001",
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
-            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            approved_scope_hash="53215c72aacaba4c01f67e3c60da49dee4e7289674168a269034b7fc4c587111",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
             base_sha=self.base_sha,
         )
@@ -398,9 +480,11 @@ class TestFakeJulesAdapter(unittest.TestCase):
         req2 = JulesSessionRequest(
             task_id="TEST-TASK-002",
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
-            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            approved_scope_hash="53215c72aacaba4c01f67e3c60da49dee4e7289674168a269034b7fc4c587111",
             idempotency_key="idem-v1:4444444444444444444444444444444444444444444444444444444444444444",
             base_sha=self.base_sha,
+            allowed_paths=SAMPLE_ALLOWED_PATHS,
+            forbidden_paths=SAMPLE_FORBIDDEN_PATHS,
             source_name="sources/src-test-001",
         )
         pg2 = PreGateResult(
@@ -410,7 +494,7 @@ class TestFakeJulesAdapter(unittest.TestCase):
             status="APPROVED",
             task_id="TEST-TASK-002",
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
-            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            approved_scope_hash="53215c72aacaba4c01f67e3c60da49dee4e7289674168a269034b7fc4c587111",
             idempotency_key="idem-v1:4444444444444444444444444444444444444444444444444444444444444444",
             base_sha=self.base_sha,
         )
@@ -464,16 +548,18 @@ class TestRealJulesAdapter(unittest.TestCase):
             status="APPROVED",
             task_id="REAL-TASK-001",
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
-            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            approved_scope_hash="53215c72aacaba4c01f67e3c60da49dee4e7289674168a269034b7fc4c587111",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
             base_sha=self.base_sha,
         )
         self.valid_request = JulesSessionRequest(
             task_id="REAL-TASK-001",
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
-            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            approved_scope_hash="53215c72aacaba4c01f67e3c60da49dee4e7289674168a269034b7fc4c587111",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
             base_sha=self.base_sha,
+            allowed_paths=SAMPLE_ALLOWED_PATHS,
+            forbidden_paths=SAMPLE_FORBIDDEN_PATHS,
             source_name="sources/github/test-owner/test-repository",
             prompt="실제 어댑터 테스트 프롬프트",
         )
@@ -535,9 +621,11 @@ class TestRealJulesAdapter(unittest.TestCase):
         bad_request = JulesSessionRequest(
             task_id="REAL-TASK-001",
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
-            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            approved_scope_hash="53215c72aacaba4c01f67e3c60da49dee4e7289674168a269034b7fc4c587111",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
             base_sha="badbadbadbadbadbadbadbadbadbadbadbadbadb",
+            allowed_paths=SAMPLE_ALLOWED_PATHS,
+            forbidden_paths=SAMPLE_FORBIDDEN_PATHS,
             source_name="sources/github/test-owner/test-repository",
         )
         # Contract의 SHA도 요청과 같게 맞춤 (그래야 Contract 불일치가 아닌 원격 불일치로 통과)
@@ -548,7 +636,7 @@ class TestRealJulesAdapter(unittest.TestCase):
             status="APPROVED",
             task_id="REAL-TASK-001",
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
-            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            approved_scope_hash="53215c72aacaba4c01f67e3c60da49dee4e7289674168a269034b7fc4c587111",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
             base_sha="badbadbadbadbadbadbadbadbadbadbadbadbadb",
         )
@@ -566,7 +654,7 @@ class TestRealJulesAdapter(unittest.TestCase):
             status="APPROVED",
             task_id="REAL-TASK-001",
             contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
-            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            approved_scope_hash="53215c72aacaba4c01f67e3c60da49dee4e7289674168a269034b7fc4c587111",
             idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
             base_sha="different_approved_sha_from_contract_123",
         )
@@ -583,9 +671,11 @@ class TestRealJulesAdapter(unittest.TestCase):
                 req = JulesSessionRequest(
                     task_id="REAL-TASK-001",
                     contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
-                    approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+                    approved_scope_hash="53215c72aacaba4c01f67e3c60da49dee4e7289674168a269034b7fc4c587111",
                     idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
                     base_sha=self.base_sha,
+            allowed_paths=SAMPLE_ALLOWED_PATHS,
+            forbidden_paths=SAMPLE_FORBIDDEN_PATHS,
                     source_name=bad_src,
                 )
                 res = self.adapter.create_session(req, self.valid_pre_gate)
