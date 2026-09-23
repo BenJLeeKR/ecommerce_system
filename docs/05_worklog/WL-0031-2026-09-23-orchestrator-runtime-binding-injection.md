@@ -1,9 +1,9 @@
 # WL-0031: Orchestrator Runtime Binding Injection
 
-- **Date:** 2026-09-23 (KST)
-- **Author:** Jules
-- **Task ID:** JULES-RUNTIME-BINDING-INJECTION-001
-- **Status:** Completed
+- **작성일:** 2026-09-23 (KST)
+- **작성자:** Jules
+- **태스크 ID:** JULES-RUNTIME-BINDING-INJECTION-001
+- **상태:** Completed
 
 ## 1. 작업 개요
 본 작업은 Orchestrator의 완료 결과 검토 인계 과정(`execute_review_handoff`)에 Jules 상태 저장소 팩토리 주입 지점을 신설하여, 1:1:1 세션 결속(Session:Branch:PR) 정보가 영속화될 수 있는 통합 지점을 마련하는 데 목적이 있습니다. 실제 `.env` 변경이나 외부 DB 초기화는 수행하지 않으며, 기존 직접 `repository` 주입과 미주입 시의 동작은 그대로 보존합니다.

@@ -518,8 +518,6 @@ class TestReviewHandoff(unittest.TestCase):
             self.assertEqual(transition.reason, "BINDING_SAVE_ERROR")
             self.assertEqual(len(self.codex_adapter.notified_packages), 0)
 
-if __name__ == "__main__":
-    unittest.main()
 
     def test_factory_injection_without_repository(self):
         """repository 없이 jules_state_repository_factory가 전달되면 팩토리가 호출되어
@@ -668,3 +666,6 @@ if __name__ == "__main__":
         self.assertEqual(transition.to_status, "NEEDS_HUMAN_REVIEW")
         self.assertEqual(transition.reason, "FACTORY_INIT_ERROR")
         self.assertEqual(len(self.codex_adapter.notified_packages), 0)
+
+if __name__ == "__main__":
+    unittest.main()
