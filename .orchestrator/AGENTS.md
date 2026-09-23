@@ -60,3 +60,7 @@
   - 위 VM 오류의 두 번째 실패
   - 코드 로직 및 비즈니스 규칙과 관련된 다른 유형의 오류 발생
   - 1:1:1 세션/브랜치/PR 바인딩 원칙 위반
+
+## Orchestrator 동작 원칙
+
+- **Canonical Scope Hash 사전 검증**: Jules 세션을 생성하기 전, Task Contract의 `allowed_paths` 및 `forbidden_paths`에 대한 정규화 해시를 선제적으로 산출 및 검증하여, 불일치/실패 시 즉각 `NEEDS_HUMAN_REVIEW` 상태로 세션 생성을 거부합니다.

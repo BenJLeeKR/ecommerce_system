@@ -10,6 +10,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Callable
+from .models import PathItem
+from .canonicalization import canonicalize_scope, ScopeCanonicalizationError
 
 
 REASON_CODE_REGEX = re.compile(r"^[A-Z0-9_]{1,64}$")
@@ -99,6 +101,8 @@ class JulesSessionRequest:
     approved_scope_hash: str
     idempotency_key: str
     base_sha: str
+    allowed_paths: List[PathItem]
+    forbidden_paths: List[PathItem]
     source_name: str = field(repr=False) # 형식: 'sources/<id>' 또는 'sources/github/<owner>/<repo>' (명시적 주입 필수)
     prompt: Optional[str] = field(default="", repr=False)
 
@@ -199,6 +203,32 @@ class FakeJulesAdapter(JulesAdapter):
         self, request: JulesSessionRequest, pre_gate_result: PreGateResult
     ) -> JulesSessionResponse:
         now = self._now()
+
+        # 0. Canonical Scope Hash 사전 검증
+        try:
+            _, computed_scope_hash = canonicalize_scope(request.allowed_paths, request.forbidden_paths)
+            if computed_scope_hash != request.approved_scope_hash:
+                return JulesSessionResponse(
+                    session_id="",
+                    task_id=request.task_id,
+                    branch_name=None,
+                    pr_number=None,
+                    status="NEEDS_HUMAN_REVIEW",
+                    reason_code="SCOPE_HASH_MISMATCH",
+                    created_at_utc=now,
+                    updated_at_utc=now,
+                )
+        except Exception:
+            return JulesSessionResponse(
+                session_id="",
+                task_id=request.task_id,
+                branch_name=None,
+                pr_number=None,
+                status="NEEDS_HUMAN_REVIEW",
+                reason_code="SCOPE_LOCK_CANONICALIZATION_FAILED",
+                created_at_utc=now,
+                updated_at_utc=now,
+            )
 
         # 1. 사전 게이트 검증 (is_valid=True, is_session_creation_authorized=True, status="APPROVED" 요구)
         if (
@@ -596,6 +626,32 @@ class RealJulesAdapter(JulesAdapter):
         self, request: JulesSessionRequest, pre_gate_result: PreGateResult
     ) -> JulesSessionResponse:
         now = self._now()
+
+        # 0. Canonical Scope Hash 사전 검증
+        try:
+            _, computed_scope_hash = canonicalize_scope(request.allowed_paths, request.forbidden_paths)
+            if computed_scope_hash != request.approved_scope_hash:
+                return JulesSessionResponse(
+                    session_id="",
+                    task_id=request.task_id,
+                    branch_name=None,
+                    pr_number=None,
+                    status="NEEDS_HUMAN_REVIEW",
+                    reason_code="SCOPE_HASH_MISMATCH",
+                    created_at_utc=now,
+                    updated_at_utc=now,
+                )
+        except Exception:
+            return JulesSessionResponse(
+                session_id="",
+                task_id=request.task_id,
+                branch_name=None,
+                pr_number=None,
+                status="NEEDS_HUMAN_REVIEW",
+                reason_code="SCOPE_LOCK_CANONICALIZATION_FAILED",
+                created_at_utc=now,
+                updated_at_utc=now,
+            )
 
         # 1. 사전 게이트 검증
         if (

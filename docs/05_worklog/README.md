@@ -36,3 +36,4 @@
 - [WL-0032](WL-0032-2026-09-23-runtime-entrypoint-integration.md) — 최상위 검토 인계 진입점 통합 준비와 테스트 및 Worklog 갱신을 완료했다.
 - [WL-0033-2026-09-23-runtime-db-initialization-documentation](WL-0033-2026-09-23-runtime-db-initialization.md) — 외부 상태 디렉터리 확인, 빈 DB 초기화 및 최소 권한 적용을 비민감 범위 내에서 문서에 정합화한 내역 기록.
 - [WL-0034](WL-0034-2026-09-23-orchestrator-runtime-backup-recovery-analysis.md) — Runtime DB 백업·복구 분석 수행 및 초기 권장안(승인 대기) 제안 내역 기록.
+- [WL-0035](WL-0035-2026-09-23-canonical-scope-hash-guard.md) — Canonical Scope Hash Guard를 적용하여 세션 생성 전 범위 무결성을 사전 검증하도록 구현했다.
