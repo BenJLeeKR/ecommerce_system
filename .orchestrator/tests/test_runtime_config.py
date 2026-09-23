@@ -118,7 +118,7 @@ class TestJulesRuntimeConfig(unittest.TestCase):
         self.assertIsInstance(repo, StateRepository)
         self.assertEqual(repo.db_path.name, "jules_orchestrator_state.db")
         self.assertEqual(repo.db_path.parent, target_path)
-        self.assertTrue(target_path.exists()) # StateRepository initialization creates directory and db
+        self.assertTrue(target_path.exists()) # StateRepository 초기화 시 디렉터리와 DB가 생성됨
 
     def test_get_jules_state_repository_rejects_relative_path(self) -> None:
         env_path = self._write_env("ORCHESTRATOR_JULES_STATE_DIR=relative/path\n")
