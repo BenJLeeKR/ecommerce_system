@@ -59,13 +59,19 @@ class TestJulesRuntimeConfig(unittest.TestCase):
         self.assertEqual(default_path.name, ".env")
         self.assertEqual(default_path.parent.name, ".orchestrator")
 
-    def test_loads_state_dir_successfully(self) -> None:
+    def test_package_public_api_export(self) -> None:
+        import orchestrator
+        self.assertTrue(hasattr(orchestrator, "load_orchestrator_jules_state_dir"))
+        self.assertIn("load_orchestrator_jules_state_dir", orchestrator.__all__)
+
+    def test_loads_state_dir_successfully_and_does_not_create_directory(self) -> None:
         # 1. 절대 경로 2. Repo 외부(root(/) 테스트용)
         env_path = self._write_env("ORCHESTRATOR_JULES_STATE_DIR=/tmp/test-state-dir\n")
 
         state_dir = load_orchestrator_jules_state_dir(env_path)
 
         self.assertEqual(str(state_dir), "/tmp/test-state-dir")
+        self.assertFalse(state_dir.exists(), "로더는 실제 디렉터리를 생성해서는 안 됩니다.")
 
     def test_rejects_missing_state_dir(self) -> None:
         env_path = self._write_env("JULES_API_KEY=key\n")

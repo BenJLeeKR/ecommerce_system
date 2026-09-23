@@ -41,6 +41,7 @@ from .runtime_config import (
     get_default_env_file_path,
     load_jules_api_key,
     load_jules_runtime_config,
+    load_orchestrator_jules_state_dir,
 )
 
 from .result_package import generate_result_package
@@ -87,6 +88,7 @@ __all__ = [
     "get_default_env_file_path",
     "load_jules_api_key",
     "load_jules_runtime_config",
+    "load_orchestrator_jules_state_dir",
     "generate_result_package",
     "CodexNotificationAdapter",
     "execute_review_handoff",
