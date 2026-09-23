@@ -1,5 +1,4 @@
 import unittest
-from unittest.mock import MagicMock
 from typing import List, Optional
 
 from orchestrator.models import (
@@ -76,12 +75,6 @@ class TestReviewEntrypoint(unittest.TestCase):
             reason_code=""
         )
 
-        self.valid_session = JulesSessionResponse(
-            session_id=self.valid_session_id,
-            status="COMPLETED",
-            created_at_utc="2023-01-01T00:00:00Z",
-            updated_at_utc="2023-01-01T00:00:00Z", task_id="TASK-001", branch_name="feature/test", pr_number=42, reason_code=""
-        )
 
         self.codex_adapter = DummyCodexAdapter()
         self.jules_adapter = DummyJulesAdapter()
