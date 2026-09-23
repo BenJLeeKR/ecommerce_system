@@ -56,6 +56,8 @@ from .manual_entrypoint import execute_manual_session_monitor
 
 from .review_entrypoint import execute_review_handoff_with_repository
 
+from .dispatch_entrypoint import execute_dispatch_session
+
 __all__ = [
     "PathItem",
     "TaskContract",
@@ -98,4 +100,5 @@ __all__ = [
     "execute_review_handoff",
     "execute_manual_session_monitor",
     "execute_review_handoff_with_repository",
+    "execute_dispatch_session",
 ]

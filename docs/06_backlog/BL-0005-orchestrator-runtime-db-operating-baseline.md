@@ -45,6 +45,7 @@ Orchestrator의 상태와 기록을 관리하는 Runtime SQLite DB를 안정적�
 - **2026-09-23 (KST)**: Jules 세션을 통해 백업·복구 옵션(AN-0008)을 분석하고 초기 권장안(일 1회 백업, 30일 보존, RPO 24h, RTO 4h)을 'Codex 권장안 / 사용자 승인 대기' 상태로 제시함. 백업 스케줄러/권한 등의 실제 적용은 본 단계에서 제외되었으며 결정 후 인프라 구성 태스크에서 별도 진행할 예정임.
 
 - **2026-09-23 (KST)**: Canonical Scope Hash 사전 검증이 완료됨. Jules 세션 생성 전 `allowed_paths` 및 `forbidden_paths`의 정규화 해시를 선제적으로 계산하여 `approved_scope_hash`와 불일치하거나 정규화 실패 시 즉시 `NEEDS_HUMAN_REVIEW`로 전이하여 세션 생성을 원천 차단하는 통제가 적용됨. (완료된 통제 개선)
+- **2026-09-23 (KST)**: Dispatch 진입점(`execute_dispatch_session`) 구현 완료. 승인 상태, 정책(auto_merge, plan_approval_required), 해시(contract hash, approved scope hash) 및 기준 SHA에 대한 사전 검증이 적용되었으며, 불일치 시 실제 API 호출 및 외부 Runtime DB 접근 없이 즉시 `NEEDS_HUMAN_REVIEW`로 중단하는 통제가 확립됨.
 
 ## 잔여 운영 항목
 - 실제 1:1:1 결속 데이터 기록 활성화
