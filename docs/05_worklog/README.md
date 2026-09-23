@@ -38,4 +38,4 @@
 - [WL-0034](WL-0034-2026-09-23-orchestrator-runtime-backup-recovery-analysis.md) — Runtime DB 백업·복구 분석 수행 및 초기 권장안(승인 대기) 제안 내역 기록.
 
 ## 작업 로그 목록
-- [WL-0035] Canonical Scope Hash Guard 적용
+- [WL-0035](WL-0035-2026-09-23-canonical-scope-hash-guard.md) Canonical Scope Hash Guard 적용

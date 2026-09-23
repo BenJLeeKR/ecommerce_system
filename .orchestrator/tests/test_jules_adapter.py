@@ -528,6 +528,43 @@ class TestFakeJulesAdapter(unittest.TestCase):
 
 
 class TestRealJulesAdapter(unittest.TestCase):
+
+    def test_create_session_scope_canonicalization_failed_prevents_api_call(self):
+        invalid_paths = [PathItem(path="/absolute/path", kind="file")]
+
+        req = JulesSessionRequest(
+            task_id="REAL-TASK-001",
+            contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
+            approved_scope_hash="2222222222222222222222222222222222222222222222222222222222222222",
+            idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
+            base_sha=self.base_sha,
+            allowed_paths=invalid_paths,
+            forbidden_paths=SAMPLE_FORBIDDEN_PATHS,
+            source_name="sources/github/test-owner/test-repository"
+        )
+
+        resp = self.adapter.create_session(req, self.valid_pre_gate)
+        self.assertEqual(resp.status, "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(resp.reason_code, "SCOPE_LOCK_CANONICALIZATION_FAILED")
+        self.assertEqual(len(self.mock_transport.requests), 0)
+
+    def test_create_session_scope_hash_mismatch_prevents_api_call(self):
+        req = JulesSessionRequest(
+            task_id="REAL-TASK-001",
+            contract_hash="1111111111111111111111111111111111111111111111111111111111111111",
+            approved_scope_hash="hash_s_wrong",
+            idempotency_key="idem-v1:3333333333333333333333333333333333333333333333333333333333333333",
+            base_sha=self.base_sha,
+            allowed_paths=SAMPLE_ALLOWED_PATHS,
+            forbidden_paths=SAMPLE_FORBIDDEN_PATHS,
+            source_name="sources/github/test-owner/test-repository"
+        )
+
+        resp = self.adapter.create_session(req, self.valid_pre_gate)
+        self.assertEqual(resp.status, "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(resp.reason_code, "SCOPE_HASH_MISMATCH")
+        self.assertEqual(len(self.mock_transport.requests), 0)
+
     """RealJulesAdapter 및 가짜 전송 계층 연동 기능 단위 테스트."""
 
     def setUp(self) -> None:

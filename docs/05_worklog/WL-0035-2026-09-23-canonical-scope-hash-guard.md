@@ -1,6 +1,6 @@
 ---
 작성일: 2026-09-23T10:00:00+09:00
-작성자: Codex
+작성자: Jules
 태스크 ID: ORCHESTRATOR-CANONICAL-SCOPE-HASH-GUARD-001
 상태: 완료
 ---
