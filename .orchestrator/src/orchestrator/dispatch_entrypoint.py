@@ -57,6 +57,15 @@ def execute_dispatch_session(
         error_response.reason_code = "INVALID_SOURCE_NAME"
         return error_response
 
+    # 하드 블록 정책: 승인 증적 ACTIVE 여부, auto_merge, plan_approval_required
+    if approval_evidence.status != "ACTIVE":
+        error_response.reason_code = "APPROVAL_NOT_ACTIVE"
+        return error_response
+
+    if contract.auto_merge:
+        error_response.reason_code = "AUTO_MERGE_NOT_ALLOWED"
+        return error_response
+
     if not contract.plan_approval_required:
         error_response.reason_code = "PLAN_APPROVAL_REQUIRED"
         return error_response
@@ -78,13 +87,11 @@ def execute_dispatch_session(
         return error_response
 
     # 사전 검증 3: 동적 정책 평가 (evaluate_dispatch_policy)
-    is_eligible, reasons = evaluate_dispatch_policy(
+    # is_eligible 값은 PreGateResult에 보존되어 전달되며,
+    # 명시적 세션 생성 권한(is_session_creation_authorized)이 있으므로 이 값으로 차단하지 않음.
+    is_eligible, _ = evaluate_dispatch_policy(
         contract, calculated_contract_hash, calculated_scope_hash, approval_evidence
     )
-    if not is_eligible:
-        # 정책 실패 사유가 여러 개일 수 있으나 첫 번째 주요 원인(또는 정책 거부 코드)을 할당
-        error_response.reason_code = "DISPATCH_POLICY_VIOLATION"
-        return error_response
 
     # 사전 검증 4: 기준 SHA 대조
     if contract.base_commit_sha != actual_base_sha:

@@ -140,18 +140,18 @@ class TestDispatchEntrypoint(unittest.TestCase):
         self.mock_transport.request.assert_not_called()
 
     def test_approval_not_active(self):
-        """승인 상태가 ACTIVE가 아니면 중단 (정책 평가 실패)."""
+        """승인 상태가 ACTIVE가 아니면 하드 블록 중단."""
         self.evidence.status = "WITHDRAWN"
         response = execute_dispatch_session(
             self.contract, self.evidence, self.source_name, "dummy", True, self.jules_adapter, self.actual_base_sha
         )
         self.assertEqual(response.status, "NEEDS_HUMAN_REVIEW")
-        self.assertEqual(response.reason_code, "DISPATCH_POLICY_VIOLATION")
+        self.assertEqual(response.reason_code, "APPROVAL_NOT_ACTIVE")
         self.assertTrue(response.created_at_utc) # UTC 시간 확인
         self.mock_transport.request.assert_not_called()
 
     def test_auto_merge_not_allowed(self):
-        """auto_merge가 True이면 중단 (정책 평가 실패)."""
+        """auto_merge가 True이면 하드 블록 중단."""
         self.contract.auto_merge = True
 
         _, self.evidence.contract_hash = canonicalize_contract(self.contract) # 해시 불일치를 막기 위해 갱신
@@ -160,7 +160,7 @@ class TestDispatchEntrypoint(unittest.TestCase):
             self.contract, self.evidence, self.source_name, "dummy", True, self.jules_adapter, self.actual_base_sha
         )
         self.assertEqual(response.status, "NEEDS_HUMAN_REVIEW")
-        self.assertEqual(response.reason_code, "DISPATCH_POLICY_VIOLATION")
+        self.assertEqual(response.reason_code, "AUTO_MERGE_NOT_ALLOWED")
         self.mock_transport.request.assert_not_called()
 
     def test_plan_approval_not_required(self):
@@ -216,16 +216,30 @@ class TestDispatchEntrypoint(unittest.TestCase):
         self.assertEqual(response.reason_code, "SCOPE_CANONICALIZATION_FAILED")
         self.mock_transport.request.assert_not_called()
 
-    def test_dispatch_policy_violation(self):
-        """동적 정책 평가(위험도 MEDIUM 등) 실패 시 API 호출 없이 중단."""
+    def test_medium_risk_with_authorization_success(self):
+        """MEDIUM 위험도라도 명시적 권한이 있으면 세션 생성 진행 (is_eligible=False 전달)."""
         self.contract.risk_level = "MEDIUM"
         _, self.evidence.contract_hash = canonicalize_contract(self.contract)
 
         response = execute_dispatch_session(
             self.contract, self.evidence, self.source_name, "dummy", True, self.jules_adapter, self.actual_base_sha
         )
+        self.assertEqual(response.status, "CREATED")
+
+        # 어댑터에 전달된 PreGateResult 검증 (단위 테스트에서 접근 불가한 내부 변수이므로 mock transport body의 전달 여부를 통해 우회/혹은 어댑터 반환 여부 확인)
+        # HTTP Transport는 호출되었어야 함.
+        self.mock_transport.request.assert_called_once()
+
+    def test_medium_risk_without_authorization_blocked(self):
+        """MEDIUM 위험도이고 명시적 권한이 없으면 세션 생성 차단."""
+        self.contract.risk_level = "MEDIUM"
+        _, self.evidence.contract_hash = canonicalize_contract(self.contract)
+
+        response = execute_dispatch_session(
+            self.contract, self.evidence, self.source_name, "dummy", False, self.jules_adapter, self.actual_base_sha
+        )
         self.assertEqual(response.status, "NEEDS_HUMAN_REVIEW")
-        self.assertEqual(response.reason_code, "DISPATCH_POLICY_VIOLATION")
+        self.assertEqual(response.reason_code, "SESSION_CREATION_NOT_AUTHORIZED")
         self.mock_transport.request.assert_not_called()
 
 if __name__ == '__main__':
