@@ -158,6 +158,8 @@ def execute_review_handoff(
         if active_repo is None and jules_state_repository_factory is not None:
             try:
                 active_repo = jules_state_repository_factory()
+                if not isinstance(active_repo, StateRepository):
+                    raise TypeError("Factory did not return a StateRepository instance")
             except Exception:
                 return StateTransition(
                     transition_id=f"trans-{_now_utc_iso()}",

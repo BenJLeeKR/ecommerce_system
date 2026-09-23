@@ -667,5 +667,75 @@ class TestReviewHandoff(unittest.TestCase):
         self.assertEqual(transition.reason, "FACTORY_INIT_ERROR")
         self.assertEqual(len(self.codex_adapter.notified_packages), 0)
 
+    def test_factory_returns_none_aborts_handoff(self):
+        """jules_state_repository_factory가 None을 반환하면 무알림/무저장, FACTORY_INIT_ERROR 전이됨을 검증."""
+        jules_adapter = MockJulesAdapter(self.valid_session, self.completed_activities)
+
+        def none_factory():
+            return None
+
+        changed_files = ["src/main.py"]
+
+        transition = execute_review_handoff(
+            task_id=self.task_id,
+            session_id=self.session_id,
+            branch_name=self.branch_name,
+            pr_identifier=self.pr_identifier,
+            changed_files=changed_files,
+            allowed_paths=self.allowed_paths,
+            forbidden_paths=self.forbidden_paths,
+            expected_contract_hash=self.contract_hash,
+            expected_approved_scope_hash=self.approved_scope_hash,
+            expected_idempotency_key=self.idempotency_key,
+            expected_approval_id=self.approval_id,
+            transition_agent=self.transition_agent,
+            jules_adapter=jules_adapter,
+            codex_adapter=self.codex_adapter,
+            jules_state_repository_factory=none_factory,
+            verified_session=self.valid_session,
+        )
+
+        self.assertEqual(transition.to_status, "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(transition.reason, "FACTORY_INIT_ERROR")
+        self.assertEqual(len(self.codex_adapter.notified_packages), 0)
+
+    def test_factory_save_exception_aborts_handoff(self):
+        """팩토리가 반환한 저장소의 save_persistent_session_binding 실패 시 BINDING_SAVE_ERROR 전이됨을 검증."""
+        jules_adapter = MockJulesAdapter(self.valid_session, self.completed_activities)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "test_state.db"
+            class ErrorRepository(StateRepository):
+                def save_persistent_session_binding(self, binding):
+                    raise Exception("Unexpected save error from factory repo")
+
+            def repo_factory():
+                return ErrorRepository(db_path)
+
+            changed_files = ["src/main.py"]
+
+            transition = execute_review_handoff(
+                task_id=self.task_id,
+                session_id=self.session_id,
+                branch_name=self.branch_name,
+                pr_identifier=self.pr_identifier,
+                changed_files=changed_files,
+                allowed_paths=self.allowed_paths,
+                forbidden_paths=self.forbidden_paths,
+                expected_contract_hash=self.contract_hash,
+                expected_approved_scope_hash=self.approved_scope_hash,
+                expected_idempotency_key=self.idempotency_key,
+                expected_approval_id=self.approval_id,
+                transition_agent=self.transition_agent,
+                jules_adapter=jules_adapter,
+                codex_adapter=self.codex_adapter,
+                jules_state_repository_factory=repo_factory,
+                verified_session=self.valid_session,
+            )
+
+            self.assertEqual(transition.to_status, "NEEDS_HUMAN_REVIEW")
+            self.assertEqual(transition.reason, "BINDING_SAVE_ERROR")
+            self.assertEqual(len(self.codex_adapter.notified_packages), 0)
+
 if __name__ == "__main__":
     unittest.main()
