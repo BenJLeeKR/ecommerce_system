@@ -22,9 +22,9 @@ class DummyStateRepository(StateRepository):
 
     def save_persistent_session_binding(self, binding: PersistentSessionBinding) -> None:
         if self.should_fail:
-            raise Exception("Mocked save error")
+            raise Exception("모의 저장 오류")
         if self.conflict:
-            raise RepositoryBindingConflictError("Mocked conflict error")
+            raise RepositoryBindingConflictError("모의 충돌 오류")
         self.saved_bindings.append(binding)
 
     def is_binding_valid(self, session_id: str, branch_name: str, pr_number: int) -> bool:
@@ -47,7 +47,7 @@ class DummyJulesAdapter:
     def get_activities(self, session_id: str) -> ActivitySummary:
         if self.should_fail:
             from orchestrator.jules_adapter import TransportError
-            raise TransportError("Mocked transport error")
+            raise TransportError("모의 전송 오류")
         return ActivitySummary(
             is_completed=self.is_completed,
             is_failed=not self.is_completed,
@@ -137,7 +137,7 @@ class TestReviewEntrypoint(unittest.TestCase):
 
         transition = self._call_entrypoint(repository=direct_repo, factory=dummy_factory)
 
-        self.assertFalse(factory_called, "Factory should not be called if repository is provided directly")
+        self.assertFalse(factory_called, "저장소가 직접 제공된 경우 팩토리가 호출되지 않아야 합니다.")
         self.assertEqual(transition.to_status, "REVIEW_READY_DETECTED")
         self.assertEqual(len(direct_repo.saved_bindings), 1)
 
@@ -145,7 +145,7 @@ class TestReviewEntrypoint(unittest.TestCase):
         """팩토리 호출 중 예외(예: RuntimeConfigError)가 발생하면 NEEDS_HUMAN_REVIEW로 전이되는지 확인."""
         def failing_factory():
             from orchestrator.runtime_config import RuntimeConfigError
-            raise RuntimeConfigError("Mocked config error")
+            raise RuntimeConfigError("모의 설정 오류")
 
         transition = self._call_entrypoint(factory=failing_factory)
 
@@ -191,7 +191,7 @@ class TestReviewEntrypoint(unittest.TestCase):
             verified_session=self.valid_session,
         )
 
-        self.assertFalse(factory_called, "Factory should not be called if review handoff is not successful")
+        self.assertFalse(factory_called, "검토 인계가 성공하지 않은 경우 팩토리가 호출되지 않아야 합니다.")
         self.assertEqual(transition.to_status, "NEEDS_HUMAN_REVIEW")
 
 
@@ -205,7 +205,7 @@ class TestReviewEntrypoint(unittest.TestCase):
                 transition_id="test", task_id="test", from_status="test", to_status="test", transition_agent="test", recorded_at_utc="test", reason=None
             )
 
-            # call without specifying factory or repository
+            # 팩토리나 저장소를 명시하지 않고 호출
             execute_review_handoff_with_repository(
                 task_id=self.valid_task_id,
                 session_id=self.valid_session_id,

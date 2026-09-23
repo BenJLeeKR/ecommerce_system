@@ -1,4 +1,4 @@
-"""Orchestrator Review Handoff Entrypoint.
+"""Orchestrator 최상위 검토 인계 진입점 모듈.
 
 외부 호출자를 위해 Review Handoff 절차를 단일 함수로 노출하는 최상위 진입점입니다.
 이 모듈은 `execute_review_handoff`에 런타임 저장소 팩토리(`get_jules_state_repository`)를
