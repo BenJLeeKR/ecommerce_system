@@ -228,6 +228,58 @@ class PersistentSessionBinding:
 
 
 @dataclass
+class PlanSessionRegistration:
+    """브랜치·PR 생성 전 Jules Plan 세션의 비민감 임시 등록 정보."""
+    task_id: str
+    session_id: str
+    approval_id: str
+    contract_hash: str
+    approved_scope_hash: str
+    created_at_utc: str
+
+    def to_dict(self) -> Dict[str, str]:
+        return {
+            "task_id": self.task_id,
+            "session_id": "<REDACTED>",
+            "approval_id": self.approval_id,
+            "contract_hash": self.contract_hash,
+            "approved_scope_hash": self.approved_scope_hash,
+            "created_at_utc": self.created_at_utc,
+        }
+
+    def __repr__(self) -> str:
+        return "PlanSessionRegistration(task_id=%r, session_id='<REDACTED>', approval_id=%r)" % (
+            self.task_id, self.approval_id
+        )
+
+    def __str__(self) -> str:
+        return self.__repr__()
+
+
+@dataclass
+class PlanSessionRegistrationResult:
+    """Plan 단계 등록·조회 결과. 원문 Plan·활동은 포함하지 않는다."""
+    status: str
+    reason_code: Optional[str] = None
+    registration: Optional[PlanSessionRegistration] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "status": self.status,
+            "reason_code": self.reason_code,
+            "registration": self.registration.to_dict() if self.registration else None,
+        }
+
+    def __repr__(self) -> str:
+        return "PlanSessionRegistrationResult(status=%r, reason_code=%r, registration=%r)" % (
+            self.status, self.reason_code, self.registration
+        )
+
+    def __str__(self) -> str:
+        return self.__repr__()
+
+
+@dataclass
 class CodexReviewResultPackage:
     """Codex 검토 대기용 구조화 결과 패키지 데이터 모델.
 

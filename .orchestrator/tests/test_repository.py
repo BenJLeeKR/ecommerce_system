@@ -12,6 +12,7 @@ from orchestrator.models import (
     StateTransition,
     ScopeValidationRecord,
     PersistentSessionBinding,
+    PlanSessionRegistration,
 )
 from orchestrator.repository import (
     StateRepository,
@@ -419,6 +420,94 @@ class TestStateRepository(unittest.TestCase):
                 os.environ.pop("ORCHESTRATOR_STATE_DIR", None)
             else:
                 os.environ["ORCHESTRATOR_STATE_DIR"] = old_env
+
+
+    def test_plan_session_registration_save_get_and_conflicts(self):
+        """Plan 단계 등록은 최종 영구 결속과 분리되어 저장·조회·중복 차단된다."""
+        registration = PlanSessionRegistration(
+            task_id="TASK-PLAN-001",
+            session_id="sessions/plan-001",
+            approval_id="APV-PLAN-001",
+            contract_hash="hash_contract_plan",
+            approved_scope_hash="hash_scope_plan",
+            created_at_utc="2026-09-24T00:00:00Z",
+        )
+        self.repo.save_plan_session_registration(registration)
+        self.repo.save_plan_session_registration(registration)
+
+        retrieved = self.repo.get_plan_session_registration("TASK-PLAN-001")
+        self.assertIsNotNone(retrieved)
+        self.assertEqual(retrieved.session_id, "sessions/plan-001")
+        self.assertEqual(retrieved.approval_id, "APV-PLAN-001")
+
+        conflicting = PlanSessionRegistration(
+            task_id="TASK-PLAN-001",
+            session_id="sessions/plan-002",
+            approval_id="APV-PLAN-001",
+            contract_hash="hash_contract_plan",
+            approved_scope_hash="hash_scope_plan",
+            created_at_utc="2026-09-24T00:00:00Z",
+        )
+        with self.assertRaises(RepositoryBindingConflictError):
+            self.repo.save_plan_session_registration(conflicting)
+
+    def test_plan_session_registration_does_not_replace_persistent_binding(self):
+        """Plan 단계 등록 후에도 기존 PersistentSessionBinding 동작이 유지된다."""
+        plan = PlanSessionRegistration(
+            task_id="TASK-PLAN-002",
+            session_id="sessions/plan-003",
+            approval_id="APV-PLAN-002",
+            contract_hash="hash_contract_plan",
+            approved_scope_hash="hash_scope_plan",
+            created_at_utc="2026-09-24T00:00:00Z",
+        )
+        self.repo.save_plan_session_registration(plan)
+        binding = PersistentSessionBinding(
+            task_id="TASK-PLAN-002",
+            session_id="sessions/plan-003",
+            branch_name="actual-branch",
+            pr_number=101,
+            contract_hash="hash_contract_plan",
+            approved_scope_hash="hash_scope_plan",
+            recorded_at_utc="2026-09-24T00:01:00Z",
+        )
+        self.repo.save_persistent_session_binding(binding)
+        self.assertIsNotNone(self.repo.get_plan_session_registration("TASK-PLAN-002"))
+        self.assertIsNotNone(self.repo.get_persistent_session_binding("sessions/plan-003"))
+
+        post_binding_registration = PlanSessionRegistration(
+            task_id="TASK-PLAN-003",
+            session_id="sessions/plan-003",
+            approval_id="APV-PLAN-003",
+            contract_hash="hash_contract_plan",
+            approved_scope_hash="hash_scope_plan",
+            created_at_utc="2026-09-24T00:02:00Z",
+        )
+        with self.assertRaises(RepositoryBindingConflictError):
+            self.repo.save_plan_session_registration(post_binding_registration)
+
+
+    def test_plan_session_registration_rejects_duplicate_session_for_another_task(self):
+        """같은 Plan 세션은 다른 Task에 재등록할 수 없다."""
+        first = PlanSessionRegistration(
+            task_id="TASK-PLAN-004",
+            session_id="sessions/shared-plan",
+            approval_id="APV-PLAN-004",
+            contract_hash="hash_contract_plan",
+            approved_scope_hash="hash_scope_plan",
+            created_at_utc="2026-09-24T00:00:00Z",
+        )
+        self.repo.save_plan_session_registration(first)
+        duplicate_session = PlanSessionRegistration(
+            task_id="TASK-PLAN-005",
+            session_id="sessions/shared-plan",
+            approval_id="APV-PLAN-005",
+            contract_hash="hash_contract_plan",
+            approved_scope_hash="hash_scope_plan",
+            created_at_utc="2026-09-24T00:01:00Z",
+        )
+        with self.assertRaises(RepositoryBindingConflictError):
+            self.repo.save_plan_session_registration(duplicate_session)
 
 
 if __name__ == "__main__":
