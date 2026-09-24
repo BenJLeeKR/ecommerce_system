@@ -821,9 +821,9 @@ class RealJulesAdapter(JulesAdapter):
         """GET /sessions/{session_resource_name}/activities 연동 (Plan 원문 전용 조회).
 
         이 메서드는 plan_review_reader 전용 좁은 경계로서, 최신 planGenerated 이벤트의
-        'plan' 필드 내 원문만을 반환합니다. 일반적인 ActivitySummary나 구조화 결과에는
-        포함되지 않으며, 비영속/비로그 호출을 전제로 설계되었습니다.
-        단일 키 'plan'에서 문자열 텍스트를 추출하며, 불확실한 경우(파싱 실패, 시간 순서 신뢰 불가 등)
+        'plan' 객체의 'steps' 배열 내의 제목과 설명만을 반환합니다.
+        일반적인 ActivitySummary나 구조화 결과에는 포함되지 않으며, 비영속/비로그 호출을 전제로 설계되었습니다.
+        'steps' 배열 형식이 아니거나, 제목/설명이 문자열이 아닌 등 불확실한 경우(파싱 실패, 시간 순서 신뢰 불가 등)
         None을 반환하여 상위에서 NEEDS_HUMAN_REVIEW 처리하도록 합니다.
         """
         if not self.validate_session_resource_name(session_resource_name):
@@ -874,8 +874,24 @@ class RealJulesAdapter(JulesAdapter):
                     # 정확한 단일 키 'plan' 확인. (다른 키 추정 금지)
                     if "plan" in plan_gen_data:
                         plan_data = plan_gen_data["plan"]
-                        if isinstance(plan_data, str):
-                            latest_plan_text = plan_data
+                        if isinstance(plan_data, dict) and "steps" in plan_data:
+                            steps = plan_data["steps"]
+                            if isinstance(steps, list) and len(steps) > 0:
+                                valid_steps = []
+                                is_valid = True
+                                for step in steps:
+                                    if not isinstance(step, dict):
+                                        is_valid = False
+                                        break
+                                    title = step.get("title")
+                                    desc = step.get("description")
+                                    if not isinstance(title, str) or not isinstance(desc, str):
+                                        is_valid = False
+                                        break
+                                    valid_steps.append(f"{title}\n{desc}")
+
+                                if is_valid:
+                                    latest_plan_text = "\n\n".join(valid_steps)
                     break
 
             return latest_plan_text

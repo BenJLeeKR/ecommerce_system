@@ -39,3 +39,4 @@
 - [WL-0035](WL-0035-2026-09-23-canonical-scope-hash-guard.md) — Canonical Scope Hash Guard를 적용하여 세션 생성 전 범위 무결성을 사전 검증하도록 구현했다.
 - [WL-0036](WL-0036-2026-09-23-orchestrator-dispatch-entrypoint.md) — Orchestrator Dispatch Entrypoint를 구현하여 세션 인계 시 사전 검증과 안전 경계를 확립했다.
 - [WL-0038](WL-0038-2026-09-24-orchestrator-manual-plan-review-reader.md) — 수동 Plan 검토 조회 인터페이스를 구현하고 비영속 원칙 및 1:1:1 결속 유예 기준을 정립했다.
+- [WL-0040](WL-0040-2026-09-24-orchestrator-manual-plan-payload-alignment.md) — 수동 Plan 조회 페이로드를 실제 planGenerated.plan.steps 객체 구조에 맞게 정합화하고 엄격한 예외 검증을 추가했다.
