@@ -1,10 +1,13 @@
+import tempfile
 import unittest
-from unittest.mock import Mock, call
+from pathlib import Path
+from unittest.mock import Mock, call, patch
 
-from orchestrator.models import TaskContract, ApprovalEvidence, PathItem
+from orchestrator.models import TaskContract, ApprovalEvidence, PathItem, TaskRecord
 from orchestrator.jules_adapter import JulesSessionResponse, JulesSessionRequest, RealJulesAdapter, JulesHttpTransport, PreGateResult
 from orchestrator.dispatch_entrypoint import execute_dispatch_session
 from orchestrator.canonicalization import canonicalize_contract, canonicalize_scope
+from orchestrator.repository import StateRepository
 
 class TestDispatchEntrypoint(unittest.TestCase):
     def setUp(self):
@@ -241,6 +244,125 @@ class TestDispatchEntrypoint(unittest.TestCase):
         self.assertEqual(response.status, "NEEDS_HUMAN_REVIEW")
         self.assertEqual(response.reason_code, "SESSION_CREATION_NOT_AUTHORIZED")
         self.mock_transport.request.assert_not_called()
+
+
+    def _plan_session_response(self):
+        return JulesSessionResponse(
+            session_id="sessions/dispatch-plan-001",
+            task_id=self.contract.task_id,
+            branch_name=None,
+            pr_number=None,
+            status="CREATED",
+            reason_code=None,
+            created_at_utc="2026-09-25T00:00:00Z",
+            updated_at_utc="2026-09-25T00:00:00Z",
+        )
+
+    def _seed_plan_session_repository(self, repository):
+        repository.save_task(TaskRecord(
+            task_id=self.contract.task_id,
+            base_commit_sha=self.contract.base_commit_sha,
+            contract_hash=self.contract_hash,
+            approved_scope_hash=self.scope_hash,
+            idempotency_key=self.contract.idempotency_key,
+            status="APPROVED",
+            created_at_utc="2026-09-25T00:00:00Z",
+            updated_at_utc="2026-09-25T00:00:00Z",
+        ))
+        repository.save_approval_evidence(self.evidence)
+
+    def test_created_session_registers_once_when_repository_is_injected(self):
+        """정상 생성 세션은 명시적 저장소 주입 시 등록을 정확히 한 번 수행한다."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repository = StateRepository(Path(temp_dir) / "state.db")
+            self._seed_plan_session_repository(repository)
+            adapter = Mock()
+            adapter.create_session.return_value = self._plan_session_response()
+
+            response = execute_dispatch_session(
+                self.contract, self.evidence, self.source_name, "dummy", True,
+                adapter, self.actual_base_sha, plan_session_repository=repository,
+            )
+
+            self.assertEqual(response.status, "CREATED")
+            adapter.create_session.assert_called_once()
+            registration = repository.get_plan_session_registration(self.contract.task_id)
+            self.assertIsNotNone(registration)
+            self.assertEqual(registration.session_id, "sessions/dispatch-plan-001")
+
+    def test_registration_failure_does_not_retry_session_creation(self):
+        """등록 실패는 API 재호출 없이 고정 사유 코드의 안전 상태로 전이한다."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repository = StateRepository(Path(temp_dir) / "state.db")
+            adapter = Mock()
+            adapter.create_session.return_value = self._plan_session_response()
+
+            response = execute_dispatch_session(
+                self.contract, self.evidence, self.source_name, "dummy", True,
+                adapter, self.actual_base_sha, plan_session_repository=repository,
+            )
+
+            self.assertEqual(response.status, "NEEDS_HUMAN_REVIEW")
+            self.assertEqual(response.reason_code, "TASK_NOT_REGISTERED")
+            adapter.create_session.assert_called_once()
+            self.assertIsNone(repository.get_plan_session_registration(self.contract.task_id))
+
+    def test_prevalidation_failure_calls_neither_adapter_nor_registration(self):
+        """사전 검증 실패 시 API와 Plan 등록 호출은 모두 0회다."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repository = StateRepository(Path(temp_dir) / "state.db")
+            adapter = Mock()
+            with patch("orchestrator.dispatch_entrypoint.register_plan_session") as registration:
+                response = execute_dispatch_session(
+                    self.contract, self.evidence, self.source_name, "dummy", False,
+                    adapter, self.actual_base_sha, plan_session_repository=repository,
+                )
+
+            self.assertEqual(response.reason_code, "SESSION_CREATION_NOT_AUTHORIZED")
+            adapter.create_session.assert_not_called()
+            registration.assert_not_called()
+
+
+    def test_non_created_response_skips_registration(self):
+        """세션 생성 성공 전 상태는 저장소가 주입돼도 등록하지 않는다."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repository = StateRepository(Path(temp_dir) / "state.db")
+            adapter = Mock()
+            pending = self._plan_session_response()
+            pending.status = "NEEDS_HUMAN_REVIEW"
+            pending.reason_code = "REMOTE_CREATE_FAILED"
+            adapter.create_session.return_value = pending
+
+            response = execute_dispatch_session(
+                self.contract, self.evidence, self.source_name, "dummy", True,
+                adapter, self.actual_base_sha, plan_session_repository=repository,
+            )
+
+            self.assertEqual(response.status, "NEEDS_HUMAN_REVIEW")
+            self.assertEqual(response.reason_code, "REMOTE_CREATE_FAILED")
+            adapter.create_session.assert_called_once()
+            self.assertIsNone(repository.get_plan_session_registration(self.contract.task_id))
+
+
+    def test_real_adapter_created_response_registers_plan_session(self):
+        """RealJulesAdapter의 생성 응답도 Plan 단계 등록 조건과 호환된다."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repository = StateRepository(Path(temp_dir) / "state.db")
+            self._seed_plan_session_repository(repository)
+
+            response = execute_dispatch_session(
+                self.contract, self.evidence, self.source_name, "dummy", True,
+                self.jules_adapter, self.actual_base_sha,
+                plan_session_repository=repository,
+            )
+
+            self.assertEqual(response.status, "CREATED")
+            self.assertIsNone(response.branch_name)
+            self.assertIsNone(response.pr_number)
+            self.mock_transport.request.assert_called_once()
+            self.assertIsNotNone(
+                repository.get_plan_session_registration(self.contract.task_id)
+            )
 
 if __name__ == '__main__':
     unittest.main()

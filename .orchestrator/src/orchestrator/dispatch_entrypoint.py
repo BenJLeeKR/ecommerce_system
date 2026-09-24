@@ -11,6 +11,8 @@ from .models import TaskContract, ApprovalEvidence, PathItem
 from .canonicalization import canonicalize_contract, canonicalize_scope, ScopeCanonicalizationError
 from .jules_adapter import JulesSessionRequest, JulesSessionResponse, PreGateResult, validate_source_name
 from .policy import evaluate_dispatch_policy
+from .plan_session_registration import register_plan_session
+from .repository import StateRepository
 
 def execute_dispatch_session(
     contract: TaskContract,
@@ -19,7 +21,8 @@ def execute_dispatch_session(
     prompt: str,
     is_session_creation_authorized: bool,
     jules_adapter: Any,
-    actual_base_sha: str
+    actual_base_sha: str,
+    plan_session_repository: Optional[StateRepository] = None,
 ) -> JulesSessionResponse:
     """디스패치 진입점 함수.
 
@@ -126,7 +129,32 @@ def execute_dispatch_session(
 
     # 어댑터 호출: main 브랜치 시작 및 planApprovalRequired=True 정책은
     # RealJulesAdapter 내부에서 HTTP 요청 생성 시 강제/보존됨
-    return jules_adapter.create_session(
+    session_response = jules_adapter.create_session(
         request=request,
         pre_gate_result=pre_gate_result
+    )
+
+    # Plan 단계 등록은 명시적으로 주입된 저장소와 성공 생성 응답이 있을 때만 수행한다.
+    # 등록 실패는 세션 생성 API를 재호출하지 않고 안전 상태로 전이한다.
+    if plan_session_repository is None or session_response.status != "CREATED":
+        return session_response
+
+    registration_result = register_plan_session(
+        repository=plan_session_repository,
+        contract=contract,
+        approval_evidence=approval_evidence,
+        session_response=session_response,
+    )
+    if registration_result.status == "REGISTERED":
+        return session_response
+
+    return JulesSessionResponse(
+        session_id=session_response.session_id,
+        task_id=session_response.task_id,
+        branch_name=session_response.branch_name,
+        pr_number=session_response.pr_number,
+        status="NEEDS_HUMAN_REVIEW",
+        reason_code=registration_result.reason_code or "PLAN_SESSION_REGISTRATION_FAILED",
+        created_at_utc=session_response.created_at_utc,
+        updated_at_utc=datetime.now(timezone.utc).isoformat(),
     )
