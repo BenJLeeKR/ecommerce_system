@@ -874,17 +874,8 @@ class RealJulesAdapter(JulesAdapter):
                     # 정확한 단일 키 'plan' 확인. (다른 키 추정 금지)
                     if "plan" in plan_gen_data:
                         plan_data = plan_gen_data["plan"]
-                        # plan_data가 문자열인 경우, 또는 dict인 경우 구조(title, steps 등)를
-                        # 문자열로 변환(원문 텍스트 획득)하는 로직 적용.
-                        # 테스트 및 공식 응답 기준에 따라 dict 형태면 json 문자열화하거나,
-                        # 순수 텍스트 필드를 추출. 여기서는 dict인 경우 json 직렬화된 문자열을 반환.
-                        import json
                         if isinstance(plan_data, str):
                             latest_plan_text = plan_data
-                        elif isinstance(plan_data, dict):
-                            latest_plan_text = json.dumps(plan_data, ensure_ascii=False)
-                        else:
-                            latest_plan_text = str(plan_data)
                     break
 
             return latest_plan_text

@@ -18,9 +18,9 @@ Codex가 Jules 세션의 최신 Plan 원문을 일회성으로 조회하고 검�
    - API 응답 중 `planGenerated` 이벤트에서 오직 단일 키 `plan`만을 사용하여 텍스트를 추출하며, 기타 키 추정을 금지함. 오류 시 원문 없이 `None`을 반환하여 차단.
 
 3. **테스트 및 검증 (`test_plan_review_reader.py` 등)**
-   - 사전 검증 불일치 시 API 호출이 발생하지 않는지 방어 로직 검증 완료.
-   - 단일 키(`plan`) 추출 성공 및 부재/형식 오류 시의 차단 동작 검증 완료.
-   - 객체 직렬화 시 원문이 노출되지 않는(마스킹) 비영속 경계 검증 완료.
+   - `canonicalize_contract`와 `canonicalize_scope`를 통한 사전 해시 검증 및 명시적 수동 검토 권한(`ManualReviewRequest`) 입력 테스트 작성.
+   - 단일 키(`plan`) 문자열 형식 검증 및 부재/오류 시 `None` 차단 동작 테스트 추가.
+   - 객체 직렬화 시 원문이 노출되지 않는(마스킹) 비영속 경계 방어 로직 반영.
 
 ## 3. 참조 문서
 - [orchestrator-manual-plan-review-reader-design.md](../99_reference/orchestrator-manual-plan-review-reader-design.md)

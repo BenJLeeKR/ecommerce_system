@@ -13,7 +13,29 @@ from typing import Dict, Any, Optional
 from dataclasses import dataclass
 from .models import TaskContract, ApprovalEvidence
 from .jules_adapter import JulesSessionResponse, validate_reason_code
+from .canonicalization import canonicalize_contract, canonicalize_scope, ScopeCanonicalizationError
 
+@dataclass
+class ManualReviewRequest:
+    """Codex의 명시적 수동 검토 권한 입력을 담는 비영속/비로그 객체.
+
+    이 객체의 데이터는 로그나 영구 저장소에 기록되지 않아야 하며,
+    검증 시에만 사용됩니다.
+    """
+    session_id: str
+    task_id: str
+    approval_id: str
+    contract_hash: str
+    approved_scope_hash: str
+
+    def __repr__(self) -> str:
+        return "ManualReviewRequest(<REDACTED>)"
+
+    def __str__(self) -> str:
+        return self.__repr__()
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {"review_request": "<REDACTED>"}
 
 @dataclass
 class PlanReviewResult:
@@ -40,7 +62,7 @@ class PlanReviewResult:
 
 
 def execute_manual_plan_review_reader(
-    session_id: str,
+    review_request: ManualReviewRequest,
     contract: TaskContract,
     approval_evidence: ApprovalEvidence,
     session_response: JulesSessionResponse,
@@ -49,34 +71,64 @@ def execute_manual_plan_review_reader(
     """PR 전 수동 Plan 검토를 위한 단회성 조회 진입점.
 
     1. 사전 검증:
-       - session_id 일치 여부
-       - session_response.task_id == contract.task_id
-       - contract.base_commit_sha 대조
+       - review_request 세션 ID == session_response.session_id
+       - review_request.task_id == contract.task_id == session_response.task_id == approval_evidence.task_id
+       - review_request.approval_id == approval_evidence.approval_id
        - contract.plan_approval_required == True
-       - Contract 해시 및 승인 증적 상태 검증
+       - contract.contract_version == approval_evidence.contract_version
+       - ApprovalEvidence.status == "ACTIVE"
+       - 계산된 contract/scope 해시가 review_request 및 approval_evidence의 값과 정확히 일치
     2. jules_adapter의 전용 조회 경계(fetch_plan_text_only)를 호출하여 원문 획득.
 
     실패 시 API 호출 없이 NEEDS_HUMAN_REVIEW 반환.
     """
     # 1. 사전 검증
-    if session_id != session_response.session_id:
+    # a. 세션 ID 대조
+    if review_request.session_id != session_response.session_id:
         return PlanReviewResult(status="NEEDS_HUMAN_REVIEW", reason_code="SESSION_ID_MISMATCH")
 
+    # b. Task ID 대조
+    if review_request.task_id != contract.task_id:
+        return PlanReviewResult(status="NEEDS_HUMAN_REVIEW", reason_code="TASK_ID_MISMATCH")
     if contract.task_id != session_response.task_id:
         return PlanReviewResult(status="NEEDS_HUMAN_REVIEW", reason_code="TASK_ID_MISMATCH")
+    if contract.task_id != approval_evidence.task_id:
+        return PlanReviewResult(status="NEEDS_HUMAN_REVIEW", reason_code="TASK_ID_MISMATCH")
+
+    # c. Approval ID 대조
+    if review_request.approval_id != approval_evidence.approval_id:
+        return PlanReviewResult(status="NEEDS_HUMAN_REVIEW", reason_code="APPROVAL_ID_MISMATCH")
+
+    # d. Contract Version 및 Evidence 상태 검증
+    if contract.contract_version != approval_evidence.contract_version:
+        return PlanReviewResult(status="NEEDS_HUMAN_REVIEW", reason_code="CONTRACT_VERSION_MISMATCH")
+    if approval_evidence.status != "ACTIVE":
+        return PlanReviewResult(status="NEEDS_HUMAN_REVIEW", reason_code="APPROVAL_NOT_ACTIVE")
 
     if not contract.plan_approval_required:
         return PlanReviewResult(status="NEEDS_HUMAN_REVIEW", reason_code="PLAN_APPROVAL_NOT_REQUIRED")
 
-    # Contract 해시 대조 (정규화된 해시를 미리 검사해야 하지만 이 진입점은 Contract와 증적이 올바르게
-    # 매핑되어 전달됨을 전제하며 최소한 상태만 확인. 좀 더 엄격한 대조는 Validator 몫이므로 여기선 최소 검증만 수행)
-    if approval_evidence.status != "ACTIVE":
-        return PlanReviewResult(status="NEEDS_HUMAN_REVIEW", reason_code="APPROVAL_NOT_ACTIVE")
+    # e. 정규화 및 해시 대조
+    try:
+        _, computed_contract_hash = canonicalize_contract(contract)
+        _, computed_scope_hash = canonicalize_scope(contract.allowed_paths, contract.forbidden_paths)
+    except ScopeCanonicalizationError:
+        return PlanReviewResult(status="NEEDS_HUMAN_REVIEW", reason_code="SCOPE_CANONICALIZATION_FAILED")
+
+    if review_request.contract_hash != computed_contract_hash:
+        return PlanReviewResult(status="NEEDS_HUMAN_REVIEW", reason_code="CONTRACT_HASH_MISMATCH")
+    if computed_contract_hash != approval_evidence.contract_hash:
+        return PlanReviewResult(status="NEEDS_HUMAN_REVIEW", reason_code="CONTRACT_HASH_MISMATCH")
+
+    if review_request.approved_scope_hash != computed_scope_hash:
+        return PlanReviewResult(status="NEEDS_HUMAN_REVIEW", reason_code="SCOPE_HASH_MISMATCH")
+    if computed_scope_hash != approval_evidence.approved_scope_hash:
+        return PlanReviewResult(status="NEEDS_HUMAN_REVIEW", reason_code="SCOPE_HASH_MISMATCH")
 
     # 2. 전용 조회 경계를 통한 원문 획득
     try:
-        plan_text = jules_adapter.fetch_plan_text_only(session_id)
-        if not plan_text:
+        plan_text = jules_adapter.fetch_plan_text_only(review_request.session_id)
+        if not isinstance(plan_text, str) or not plan_text:
              return PlanReviewResult(status="NEEDS_HUMAN_REVIEW", reason_code="PLAN_NOT_FOUND")
         return PlanReviewResult(status="PLAN_READY", plan_text=plan_text)
     except Exception:
