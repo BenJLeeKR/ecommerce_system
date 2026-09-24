@@ -43,3 +43,4 @@
 - [WL-0040](WL-0040-2026-09-24-orchestrator-manual-plan-payload-alignment.md) — 수동 Plan 조회 페이로드를 실제 planGenerated.plan.steps 객체 구조에 맞게 정합화하고 엄격한 예외 검증을 추가했다.
 
 - [WL-0042: Orchestrator 수동 리뷰(Content Handoff) 리더 구현](WL-0042-2026-09-24-orchestrator-manual-jules-content-handoff.md) - 상태: 완료
+- [WL-0043: Orchestrator 수동 콘텐츠 검토 진입점 구현](WL-0043-2026-09-24-orchestrator-manual-content-review-entrypoint.md) - 상태: 완료
