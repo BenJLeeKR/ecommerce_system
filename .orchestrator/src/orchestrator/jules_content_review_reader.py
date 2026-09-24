@@ -99,7 +99,7 @@ def fetch_content_review_activities(
     if session_id != session_response.session_id:
         return _fail("SESSION_ID_MISMATCH")
 
-    # 사전 검증 통과 후 Adapter의 전용 메서드를 통해 원시 액티비티를 안전하게 조회
+    # 진입점에서 전달받은 어댑터(Protocol/Mock 등)를 통해 원시 액티비티를 단 1회 위임 조회
     if not hasattr(adapter, "fetch_raw_activities_for_content_review"):
         return _fail("UNSUPPORTED_ADAPTER")
 
