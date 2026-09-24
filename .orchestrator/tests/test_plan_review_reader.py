@@ -305,28 +305,71 @@ class TestJulesAdapterFetchPlanTextOnly(unittest.TestCase):
         self.adapter = RealJulesAdapter(api_key="test-key", transport=self.transport)
 
     def test_fetch_plan_text_only_success(self):
-        """정상적인 문자열 plan 반환 케이스"""
+        """정상적인 객체형 plan (steps 배열 포함) 반환 케이스"""
         self.transport.responses = {
             "GET sessions/ses-1/activities": {
                 "activities": [
                     {
                         "createTime": "2023-01-01T09:00:00Z",
-                        "planGenerated": {"plan": "My Original Plan Text"}
+                        "planGenerated": {
+                            "plan": {
+                                "steps": [
+                                    {"title": "Step 1", "description": "Desc 1"},
+                                    {"title": "Step 2", "description": "Desc 2"}
+                                ]
+                            }
+                        }
                     }
                 ]
             }
         }
         res = self.adapter.fetch_plan_text_only("sessions/ses-1")
-        self.assertEqual(res, "My Original Plan Text")
+        self.assertEqual(res, "Step 1\nDesc 1\n\nStep 2\nDesc 2")
 
-    def test_fetch_plan_text_only_dict_type_rejected(self):
-        """plan 값이 dict 타입인 경우 거부 (None 반환)"""
+    def test_fetch_plan_text_only_string_type_rejected(self):
+        """기존 문자열형 plan 지원 삭제 - 거부 (None 반환)"""
         self.transport.responses = {
             "GET sessions/ses-1/activities": {
                 "activities": [
                     {
                         "createTime": "2023-01-01T09:00:00Z",
-                        "planGenerated": {"plan": {"title": "dict plan"}}
+                        "planGenerated": {"plan": "Legacy String Plan"}
+                    }
+                ]
+            }
+        }
+        res = self.adapter.fetch_plan_text_only("sessions/ses-1")
+        self.assertIsNone(res)
+
+    def test_fetch_plan_text_only_empty_steps_rejected(self):
+        """빈 steps 배열인 경우 거부"""
+        self.transport.responses = {
+            "GET sessions/ses-1/activities": {
+                "activities": [
+                    {
+                        "createTime": "2023-01-01T09:00:00Z",
+                        "planGenerated": {"plan": {"steps": []}}
+                    }
+                ]
+            }
+        }
+        res = self.adapter.fetch_plan_text_only("sessions/ses-1")
+        self.assertIsNone(res)
+
+    def test_fetch_plan_text_only_invalid_step_format_rejected(self):
+        """step의 title/description이 문자열이 아닌 경우 거부"""
+        self.transport.responses = {
+            "GET sessions/ses-1/activities": {
+                "activities": [
+                    {
+                        "createTime": "2023-01-01T09:00:00Z",
+                        "planGenerated": {
+                            "plan": {
+                                "steps": [
+                                    {"title": "Step 1", "description": 123}
+                                ]
+                            }
+                        }
                     }
                 ]
             }
