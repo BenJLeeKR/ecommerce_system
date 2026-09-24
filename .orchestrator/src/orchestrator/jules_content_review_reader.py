@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 from datetime import datetime
 
 from .canonicalization import canonicalize_scope, canonicalize_contract, ScopeCanonicalizationError
-from .jules_adapter import JulesAdapter, JulesSessionResponse
+from .jules_adapter import JulesAdapter, JulesSessionResponse, TransportError, ContentReviewFetchError
 from .validator import ApprovalEvidence, TaskContract
 
 
@@ -103,9 +103,16 @@ def fetch_content_review_activities(
     if not hasattr(adapter, "fetch_raw_activities_for_content_review"):
         return _fail("UNSUPPORTED_ADAPTER")
 
-    raw_activities = adapter.fetch_raw_activities_for_content_review(session_id)
-    if raw_activities is None:
-        return _fail("RAW_ACTIVITIES_FETCH_FAILED")
+    try:
+        raw_activities = adapter.fetch_raw_activities_for_content_review(session_id)
+        if raw_activities is None:
+            return _fail("RAW_ACTIVITIES_FETCH_FAILED")
+    except TransportError as e:
+        return _fail(e.reason_code)
+    except ContentReviewFetchError as e:
+        return _fail(e.reason_code)
+    except Exception:
+        return _fail("INTERNAL_CONTENT_REVIEW_FAILURE")
 
     parsed_activities = []
 

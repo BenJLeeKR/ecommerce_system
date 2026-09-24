@@ -10,6 +10,7 @@ from orchestrator.jules_adapter import (
     JulesHttpTransport,
     UrllibJulesHttpTransport,
     TransportError,
+    ContentReviewFetchError,
     JulesSessionRequest,
     PreGateResult,
     ActivitySummary,
@@ -915,6 +916,74 @@ class TestRealJulesAdapter(unittest.TestCase):
         self.assertNotIn("비밀 메시지", err_str)
         self.assertIn("AUTHENTICATION_FAILED", err_str)
 
+
+
+    def test_fetch_raw_activities_for_content_review_transport_error(self):
+        adapter = RealJulesAdapter(api_key="TEST_API_KEY", transport=self.mock_transport, clock_fn=lambda: "2026-09-18T10:00:00.000000+00:00")
+        for error_code in ["AUTHENTICATION_FAILED", "HTTP_CONNECTION_FAILED", "TIMEOUT_EXCEEDED", "INVALID_RESPONSE_FORMAT"]:
+            self.mock_transport.response_to_return = None
+            self.mock_transport.error_to_raise = TransportError(error_code)
+            self.mock_transport.requests = []
+            with self.assertRaises(TransportError) as ctx:
+                adapter.fetch_raw_activities_for_content_review("sessions/test-session-1")
+            self.assertEqual(ctx.exception.reason_code, error_code)
+            self.assertEqual(len(self.mock_transport.requests), 1)
+
+    def test_fetch_raw_activities_for_content_review_invalid_activities_list(self):
+        adapter = RealJulesAdapter(api_key="TEST_API_KEY", transport=self.mock_transport, clock_fn=lambda: "2026-09-18T10:00:00.000000+00:00")
+        self.mock_transport.error_to_raise = None
+        for invalid_resp in [{}, {"activities": None}, {"activities": "not_a_list"}]:
+            self.mock_transport.response_to_return = invalid_resp
+            self.mock_transport.requests = []
+            with self.assertRaises(ContentReviewFetchError) as ctx:
+                adapter.fetch_raw_activities_for_content_review("sessions/test-session-1")
+            self.assertEqual(ctx.exception.reason_code, "INVALID_ACTIVITIES_LIST_FORMAT")
+            self.assertEqual(len(self.mock_transport.requests), 1)
+
+    def test_fetch_raw_activities_for_content_review_invalid_event_structure(self):
+        adapter = RealJulesAdapter(api_key="TEST_API_KEY", transport=self.mock_transport, clock_fn=lambda: "2026-09-18T10:00:00.000000+00:00")
+        self.mock_transport.error_to_raise = None
+        invalid_events = [
+            {"activities": [{"planGenerated": {"plan": {"steps": []}}}]}, # no createTime
+            {"activities": [{"createTime": "invalid-time", "planGenerated": {"plan": {"steps": []}}}]}, # invalid time
+            {"activities": [{"createTime": "2026-09-24T00:00:00Z"}]}, # 0 union events
+            {"activities": [{"createTime": "2026-09-24T00:00:00Z", "planGenerated": {"plan": {"steps": []}}, "agentMessaged": {"agentMessage": ""}}]}, # multiple union events
+            {"activities": [{"createTime": "2026-09-24T00:00:00Z", "unsupportedEvent": {}}]}, # unsupported event
+            {"activities": [ # duplicate time
+                {"createTime": "2026-09-24T00:00:00Z", "agentMessaged": {"agentMessage": "test1"}},
+                {"createTime": "2026-09-24T00:00:00Z", "planApproved": {}}
+            ]}
+        ]
+        for invalid_resp in invalid_events:
+            self.mock_transport.response_to_return = invalid_resp
+            self.mock_transport.requests = []
+            with self.assertRaises(ContentReviewFetchError) as ctx:
+                adapter.fetch_raw_activities_for_content_review("sessions/test-session-1")
+            self.assertEqual(ctx.exception.reason_code, "INVALID_EVENT_STRUCTURE")
+            self.assertEqual(len(self.mock_transport.requests), 1)
+
+    def test_fetch_raw_activities_for_content_review_success(self):
+        adapter = RealJulesAdapter(api_key="TEST_API_KEY", transport=self.mock_transport, clock_fn=lambda: "2026-09-18T10:00:00.000000+00:00")
+        self.mock_transport.error_to_raise = None
+        self.mock_transport.response_to_return = {"activities": [{"createTime": "2026-09-24T00:00:00Z", "agentMessaged": {"agentMessage": "test"}}]}
+        self.mock_transport.requests = []
+        result = adapter.fetch_raw_activities_for_content_review("sessions/test-session-1")
+        self.assertEqual(len(result), 1)
+        self.assertEqual(len(self.mock_transport.requests), 1)
+
+    def test_content_review_fetch_error_safe_boundaries(self):
+        err = ContentReviewFetchError("INVALID_EVENT_STRUCTURE")
+        self.assertEqual(err.reason_code, "INVALID_EVENT_STRUCTURE")
+        self.assertTrue("INVALID_EVENT_STRUCTURE" in str(err))
+        self.assertTrue("INVALID_EVENT_STRUCTURE" in repr(err))
+
+        for bad_code in [None, 123, "invalid-format!", "sensitive_data_1234"]:
+            err = ContentReviewFetchError(bad_code if isinstance(bad_code, str) else str(bad_code))
+            self.assertEqual(err.reason_code, "INTERNAL_CONTENT_REVIEW_FAILURE")
+            self.assertTrue("INTERNAL_CONTENT_REVIEW_FAILURE" in str(err))
+            self.assertTrue("INTERNAL_CONTENT_REVIEW_FAILURE" in repr(err))
+            self.assertFalse(str(bad_code) in str(err))
+            self.assertFalse(str(bad_code) in repr(err))
 
 if __name__ == "__main__":
     unittest.main()

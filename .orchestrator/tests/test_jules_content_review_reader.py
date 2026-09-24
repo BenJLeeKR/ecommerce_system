@@ -1,8 +1,9 @@
 import unittest
+from unittest.mock import MagicMock
 from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 
-from orchestrator.jules_adapter import JulesSessionResponse, TransportError, RealJulesAdapter
+from orchestrator.jules_adapter import JulesSessionResponse, TransportError, ContentReviewFetchError, RealJulesAdapter
 from orchestrator.validator import ApprovalEvidence, TaskContract
 from orchestrator.jules_content_review_reader import ReviewActivity, fetch_content_review_activities
 
@@ -337,6 +338,75 @@ class TestJulesContentReviewReader(unittest.TestCase):
             from orchestrator import ReviewActivity, fetch_content_review_activities
         except ImportError:
             self.fail("Failed to import ReviewActivity or fetch_content_review_activities from orchestrator")
+
+
+    def test_fetch_content_review_activities_pre_validation_fail_0_calls(self):
+        adapter = MagicMock()
+        invalid_evidence = default_evidence()
+        invalid_evidence.status = "EXPIRED"
+        result = fetch_content_review_activities(
+            adapter=adapter,
+            session_id="sessions/test-1",
+            contract=default_contract(),
+            evidence=invalid_evidence,
+            session_response=default_session_resp()
+        )
+        self.assertEqual(result["status"], "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(result["reason_code"], "EVIDENCE_NOT_ACTIVE")
+        self.assertEqual(adapter.fetch_raw_activities_for_content_review.call_count, 0)
+
+    def test_fetch_content_review_activities_transport_error(self):
+        adapter = MagicMock()
+        adapter.fetch_raw_activities_for_content_review = MagicMock(side_effect=TransportError("AUTHENTICATION_FAILED"))
+        result = fetch_content_review_activities(
+            adapter=adapter,
+            session_id="sessions/test-1",
+            contract=default_contract(),
+            evidence=default_evidence(),
+            session_response=default_session_resp()
+        )
+        self.assertEqual(result["status"], "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(result["reason_code"], "AUTHENTICATION_FAILED")
+
+    def test_fetch_content_review_activities_content_review_fetch_error(self):
+        from orchestrator.jules_adapter import ContentReviewFetchError
+        adapter = MagicMock()
+        adapter.fetch_raw_activities_for_content_review = MagicMock(side_effect=ContentReviewFetchError("INVALID_EVENT_STRUCTURE"))
+        result = fetch_content_review_activities(
+            adapter=adapter,
+            session_id="sessions/test-1",
+            contract=default_contract(),
+            evidence=default_evidence(),
+            session_response=default_session_resp()
+        )
+        self.assertEqual(result["status"], "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(result["reason_code"], "INVALID_EVENT_STRUCTURE")
+
+    def test_fetch_content_review_activities_internal_error(self):
+        adapter = MagicMock()
+        adapter.fetch_raw_activities_for_content_review = MagicMock(side_effect=ValueError("Unexpected Error"))
+        result = fetch_content_review_activities(
+            adapter=adapter,
+            session_id="sessions/test-1",
+            contract=default_contract(),
+            evidence=default_evidence(),
+            session_response=default_session_resp()
+        )
+        self.assertEqual(result["status"], "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(result["reason_code"], "INTERNAL_CONTENT_REVIEW_FAILURE")
+
+    def test_fetch_content_review_activities_fake_none_fallback(self):
+        adapter = MagicMock()
+        adapter.fetch_raw_activities_for_content_review.return_value = None
+        result = fetch_content_review_activities(
+            adapter=adapter,
+            session_id="sessions/test-1",
+            contract=default_contract(),
+            evidence=default_evidence(),
+            session_response=default_session_resp()
+        )
+        self.assertEqual(result["status"], "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(result["reason_code"], "RAW_ACTIVITIES_FETCH_FAILED")
 
 if __name__ == '__main__':
     unittest.main()
