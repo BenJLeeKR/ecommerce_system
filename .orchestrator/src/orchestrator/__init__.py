@@ -57,6 +57,7 @@ from .manual_entrypoint import execute_manual_session_monitor
 from .review_entrypoint import execute_review_handoff_with_repository
 
 from .dispatch_entrypoint import execute_dispatch_session
+from .plan_review_reader import execute_manual_plan_review_reader, PlanReviewResult
 
 __all__ = [
     "PathItem",
@@ -101,4 +102,6 @@ __all__ = [
     "execute_manual_session_monitor",
     "execute_review_handoff_with_repository",
     "execute_dispatch_session",
+    "execute_manual_plan_review_reader",
+    "PlanReviewResult",
 ]

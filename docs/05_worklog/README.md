@@ -38,3 +38,4 @@
 - [WL-0034](WL-0034-2026-09-23-orchestrator-runtime-backup-recovery-analysis.md) — Runtime DB 백업·복구 분석 수행 및 초기 권장안(승인 대기) 제안 내역 기록.
 - [WL-0035](WL-0035-2026-09-23-canonical-scope-hash-guard.md) — Canonical Scope Hash Guard를 적용하여 세션 생성 전 범위 무결성을 사전 검증하도록 구현했다.
 - [WL-0036](WL-0036-2026-09-23-orchestrator-dispatch-entrypoint.md) — Orchestrator Dispatch Entrypoint를 구현하여 세션 인계 시 사전 검증과 안전 경계를 확립했다.
+- [WL-0038](WL-0038-2026-09-24-orchestrator-manual-plan-review-reader.md) — 수동 Plan 검토 조회 인터페이스를 구현하고 비영속 원칙 및 1:1:1 결속 유예 기준을 정립했다.
