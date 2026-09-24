@@ -30,6 +30,11 @@ execute_dispatch_session은 기존 사전 검증을 모두 통과한 뒤 세션 
 
 저장소 미주입은 기존 동작을 유지한다. 등록이 실패하면 세션 생성 API를 재호출하지 않고 원문 없는 NEEDS_HUMAN_REVIEW와 고정 사유 코드만 반환한다. 이 연결은 최종 영구 결속·원문 조회·메시지 전송 또는 자동화 기능을 추가하지 않는다.
 
+
+## 수동 Plan 검토 진입점
+1. **명시적 1회 위임 원칙**: 외부 진입점(수동 Plan 검토)에서는 `ManualPlanReviewRequest`와 같이 민감 정보가 마스킹된 DTO를 수신한다. 진입점 내에서 외부 저장소 등록 조회(상태 확인)를 정확히 1회 수행하여 식별자 및 해시를 대조한 후, 일치할 경우 기존 Reader(어댑터)에 1회 위임한다.
+2. **사전 검증(Pre-validation) 및 1:1:1 유예**: ACTIVE, plan_approval_required, auto_merge=False 조건을 검증한다. 이 단계는 PR 생성 전(Pre-PR) 단계이므로 최종 'Session-Branch-PR' 1:1:1 결속 검사가 일시적으로 유예되지만, 이는 최종 결속 단계에서의 엄격성을 절대 변경하지 않는다.
+
 ## 롤백
 
 미병합 시 PR을 수동 종료하고, 병합 후 문제가 확인되면 해당 merge commit을 수동 revert한다.
