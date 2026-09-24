@@ -10,7 +10,7 @@ from typing import Any, Dict
 from .models import TaskContract, ApprovalEvidence
 from .canonicalization import canonicalize_contract, canonicalize_scope, ScopeCanonicalizationError
 from .repository import StateRepository, RepositoryError
-from .jules_adapter import JulesHttpTransport
+from .jules_adapter import JulesSessionResponse
 from .plan_review_reader import (
     ManualReviewRequest,
     PlanReviewResult,
@@ -50,7 +50,7 @@ def _failure(reason_code: str) -> PlanReviewResult:
 def execute_manual_registered_plan_review(
     *,
     repository: StateRepository,
-    transport: JulesHttpTransport,
+    jules_adapter: Any,
     contract: TaskContract,
     approval_evidence: ApprovalEvidence,
     review_request: ManualPlanReviewRequest,
@@ -101,8 +101,7 @@ def execute_manual_registered_plan_review(
         registration.session_id != review_request.session_id):
         return _failure("REGISTRATION_MISMATCH")
 
-    # 5. 기존 Reader로 위임
-    # ManualReviewRequest 생성 후 execute_manual_plan_review_reader 호출
+    # 5. 기존 Reader로 위임하기 위해 필요한 객체 구성
     reader_request = ManualReviewRequest(
         task_id=review_request.task_id,
         approval_id=review_request.approval_id,
@@ -111,9 +110,23 @@ def execute_manual_registered_plan_review(
         session_id=review_request.session_id,
     )
 
+    # 기존 Reader 검증 통과를 위한 임시 session_response 구성
+    # (이미 위에서 저장소 대조를 마쳤으므로 CREATED 상태의 껍데기를 넘김)
+    session_response = JulesSessionResponse(
+        status="CREATED",
+        session_id=registration.session_id,
+        task_id=registration.task_id,
+        branch_name=None,
+        pr_number=None,
+        reason_code=None,
+        created_at_utc=registration.created_at_utc,
+        updated_at_utc=registration.created_at_utc,
+    )
+
     return execute_manual_plan_review_reader(
-        transport=transport,
+        review_request=reader_request,
         contract=contract,
         approval_evidence=approval_evidence,
-        review_request=reader_request,
+        session_response=session_response,
+        jules_adapter=jules_adapter,
     )

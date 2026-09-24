@@ -8,12 +8,13 @@ from orchestrator.manual_plan_review_entrypoint import (
     execute_manual_registered_plan_review,
 )
 from orchestrator.plan_session_registration import PlanSessionRegistrationResult
-from orchestrator.plan_review_reader import PlanReviewResult
+from orchestrator.plan_review_reader import PlanReviewResult, ManualReviewRequest
+from orchestrator.jules_adapter import JulesSessionResponse
 
 class TestManualPlanReviewEntrypoint(unittest.TestCase):
     def setUp(self):
         self.repository = Mock()
-        self.transport = Mock()
+        self.jules_adapter = Mock()
 
         # Valid Contract
         self.contract = TaskContract(
@@ -99,7 +100,7 @@ class TestManualPlanReviewEntrypoint(unittest.TestCase):
 
         result = execute_manual_registered_plan_review(
             repository=self.repository,
-            transport=self.transport,
+            jules_adapter=self.jules_adapter,
             contract=self.contract,
             approval_evidence=self.approval_evidence,
             review_request=self.review_request,
@@ -118,7 +119,7 @@ class TestManualPlanReviewEntrypoint(unittest.TestCase):
 
         result = execute_manual_registered_plan_review(
             repository=self.repository,
-            transport=self.transport,
+            jules_adapter=self.jules_adapter,
             contract=self.contract,
             approval_evidence=self.approval_evidence,
             review_request=self.review_request,
@@ -137,7 +138,7 @@ class TestManualPlanReviewEntrypoint(unittest.TestCase):
 
         result = execute_manual_registered_plan_review(
             repository=self.repository,
-            transport=self.transport,
+            jules_adapter=self.jules_adapter,
             contract=self.contract,
             approval_evidence=self.approval_evidence,
             review_request=self.review_request,
@@ -158,7 +159,7 @@ class TestManualPlanReviewEntrypoint(unittest.TestCase):
 
         result = execute_manual_registered_plan_review(
             repository=self.repository,
-            transport=self.transport,
+            jules_adapter=self.jules_adapter,
             contract=self.contract,
             approval_evidence=self.approval_evidence,
             review_request=self.review_request,
@@ -180,7 +181,7 @@ class TestManualPlanReviewEntrypoint(unittest.TestCase):
 
         result = execute_manual_registered_plan_review(
             repository=self.repository,
-            transport=self.transport,
+            jules_adapter=self.jules_adapter,
             contract=self.contract,
             approval_evidence=self.approval_evidence,
             review_request=self.review_request,
@@ -201,7 +202,7 @@ class TestManualPlanReviewEntrypoint(unittest.TestCase):
 
         result = execute_manual_registered_plan_review(
             repository=self.repository,
-            transport=self.transport,
+            jules_adapter=self.jules_adapter,
             contract=self.contract,
             approval_evidence=self.approval_evidence,
             review_request=self.review_request,
@@ -216,8 +217,8 @@ class TestManualPlanReviewEntrypoint(unittest.TestCase):
     @patch("orchestrator.manual_plan_review_entrypoint.execute_manual_plan_review_reader")
     @patch("builtins.open")
     @patch("logging.Logger.info")
-    def test_happy_path(self, mock_log_info, mock_open, mock_reader, mock_get_reg):
-        """정상 경로 - 조회 1회, 위임 1회 및 파일/로그 쓰기 0회"""
+    def test_happy_path_delegation_signature(self, mock_log_info, mock_open, mock_reader, mock_get_reg):
+        """정상 경로 - 조회 1회 및 Reader 시그니처 일치 여부 확인"""
         mock_get_reg.return_value = self.valid_registration_result
         mock_reader.return_value = PlanReviewResult(
             status="NEEDS_HUMAN_REVIEW",
@@ -227,7 +228,7 @@ class TestManualPlanReviewEntrypoint(unittest.TestCase):
 
         result = execute_manual_registered_plan_review(
             repository=self.repository,
-            transport=self.transport,
+            jules_adapter=self.jules_adapter,
             contract=self.contract,
             approval_evidence=self.approval_evidence,
             review_request=self.review_request,
@@ -236,11 +237,35 @@ class TestManualPlanReviewEntrypoint(unittest.TestCase):
         self.assertEqual(result.status, "NEEDS_HUMAN_REVIEW")
         self.assertEqual(result.reason_code, "PLAN_NEEDS_REVIEW")
 
-        # Verify get_plan_session_registration called exactly once
         mock_get_reg.assert_called_once_with(repository=self.repository, task_id="task-123")
 
-        # Verify execute_manual_plan_review_reader called exactly once
-        mock_reader.assert_called_once()
+        # Verify correct signature is called on execute_manual_plan_review_reader
+        # Construct expected arguments
+        expected_reader_request = ManualReviewRequest(
+            task_id="task-123",
+            approval_id="approval-456",
+            contract_hash=self.contract_hash,
+            approved_scope_hash=self.scope_hash,
+            session_id="session-789"
+        )
+        expected_session_response = JulesSessionResponse(
+            status="CREATED",
+            session_id="session-789",
+            task_id="task-123",
+            branch_name=None,
+            pr_number=None,
+            reason_code=None,
+            created_at_utc="2023-10-27T10:00:00Z",
+            updated_at_utc="2023-10-27T10:00:00Z",
+        )
+
+        mock_reader.assert_called_once_with(
+            review_request=expected_reader_request,
+            contract=self.contract,
+            approval_evidence=self.approval_evidence,
+            session_response=expected_session_response,
+            jules_adapter=self.jules_adapter
+        )
 
         # Verify file/logging not called
         mock_open.assert_not_called()
