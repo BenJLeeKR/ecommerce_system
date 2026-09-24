@@ -54,7 +54,7 @@ class TestPlanReviewReader(unittest.TestCase):
             status="ACTIVE"
         )
         self.session_res = JulesSessionResponse(
-            session_id="SES-001",
+            session_id="sessions/ses-001",
             task_id="TASK-001",
             branch_name=None,
             pr_number=None,
@@ -64,7 +64,7 @@ class TestPlanReviewReader(unittest.TestCase):
             updated_at_utc="2023-01-01T00:00:00Z"
         )
         self.request = ManualReviewRequest(
-            session_id="SES-001",
+            session_id="sessions/ses-001",
             task_id="TASK-001",
             approval_id="APV-001",
             contract_hash=self.expected_contract_hash,
@@ -84,9 +84,23 @@ class TestPlanReviewReader(unittest.TestCase):
         self.assertEqual(res.plan_text, "My Plan Text")
         self.assertEqual(self.adapter.call_count, 1)
 
+    def test_fail_invalid_session_id_format(self):
+        mod_req = copy.deepcopy(self.request)
+        mod_req.session_id = "SES-001"
+        res = execute_manual_plan_review_reader(
+            review_request=mod_req,
+            contract=self.contract,
+            approval_evidence=self.evidence,
+            session_response=self.session_res,
+            jules_adapter=self.adapter
+        )
+        self.assertEqual(res.status, "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(res.reason_code, "INVALID_SESSION_ID_FORMAT")
+        self.assertEqual(self.adapter.call_count, 0)
+
     def test_fail_session_id_mismatch(self):
         mod_req = copy.deepcopy(self.request)
-        mod_req.session_id = "SES-002"
+        mod_req.session_id = "sessions/ses-002"
         res = execute_manual_plan_review_reader(
             review_request=mod_req,
             contract=self.contract,
@@ -97,6 +111,84 @@ class TestPlanReviewReader(unittest.TestCase):
         self.assertEqual(res.status, "NEEDS_HUMAN_REVIEW")
         self.assertEqual(res.reason_code, "SESSION_ID_MISMATCH")
         self.assertEqual(self.adapter.call_count, 0)
+
+    def test_fail_contract_auto_merge_true(self):
+        mod_contract = copy.deepcopy(self.contract)
+        mod_contract.auto_merge = True
+        _, mod_hash = canonicalize_contract(mod_contract)
+        mod_req = copy.deepcopy(self.request)
+        mod_req.contract_hash = mod_hash
+        mod_ev = copy.deepcopy(self.evidence)
+        mod_ev.contract_hash = mod_hash
+
+        res = execute_manual_plan_review_reader(
+            review_request=mod_req,
+            contract=mod_contract,
+            approval_evidence=mod_ev,
+            session_response=self.session_res,
+            jules_adapter=self.adapter
+        )
+        self.assertEqual(res.status, "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(res.reason_code, "AUTO_MERGE_NOT_ALLOWED")
+        self.assertEqual(self.adapter.call_count, 0)
+
+    def test_fail_evidence_contract_version_mismatch(self):
+        mod_ev = copy.deepcopy(self.evidence)
+        mod_ev.contract_version = "v2"
+        res = execute_manual_plan_review_reader(
+            review_request=self.request,
+            contract=self.contract,
+            approval_evidence=mod_ev,
+            session_response=self.session_res,
+            jules_adapter=self.adapter
+        )
+        self.assertEqual(res.status, "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(res.reason_code, "CONTRACT_VERSION_MISMATCH")
+        self.assertEqual(self.adapter.call_count, 0)
+
+    def test_fail_evidence_scope_hash_mismatch(self):
+        mod_ev = copy.deepcopy(self.evidence)
+        mod_ev.approved_scope_hash = "wrong_scope_hash"
+        res = execute_manual_plan_review_reader(
+            review_request=self.request,
+            contract=self.contract,
+            approval_evidence=mod_ev,
+            session_response=self.session_res,
+            jules_adapter=self.adapter
+        )
+        self.assertEqual(res.status, "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(res.reason_code, "SCOPE_HASH_MISMATCH")
+        self.assertEqual(self.adapter.call_count, 0)
+
+    def test_fail_request_scope_hash_mismatch(self):
+        mod_req = copy.deepcopy(self.request)
+        mod_req.approved_scope_hash = "wrong_req_scope_hash"
+        res = execute_manual_plan_review_reader(
+            review_request=mod_req,
+            contract=self.contract,
+            approval_evidence=self.evidence,
+            session_response=self.session_res,
+            jules_adapter=self.adapter
+        )
+        self.assertEqual(res.status, "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(res.reason_code, "SCOPE_HASH_MISMATCH")
+        self.assertEqual(self.adapter.call_count, 0)
+
+    @unittest.mock.patch('builtins.open')
+    @unittest.mock.patch('sqlite3.connect')
+    @unittest.mock.patch('logging.getLogger')
+    def test_no_logging_or_persistence(self, mock_get_logger, mock_sqlite, mock_open):
+        res = execute_manual_plan_review_reader(
+            review_request=self.request,
+            contract=self.contract,
+            approval_evidence=self.evidence,
+            session_response=self.session_res,
+            jules_adapter=self.adapter
+        )
+        self.assertEqual(res.status, "PLAN_READY")
+        mock_get_logger.assert_not_called()
+        mock_sqlite.assert_not_called()
+        mock_open.assert_not_called()
 
     def test_fail_task_id_mismatch(self):
         mod_req = copy.deepcopy(self.request)

@@ -12,7 +12,7 @@ __repr__, __str__, to_dict 호출 시 마스킹되어 로그, DB, 문서 등에 
 from typing import Dict, Any, Optional
 from dataclasses import dataclass
 from .models import TaskContract, ApprovalEvidence
-from .jules_adapter import JulesSessionResponse, validate_reason_code
+from .jules_adapter import JulesSessionResponse, RealJulesAdapter
 from .canonicalization import canonicalize_contract, canonicalize_scope, ScopeCanonicalizationError
 
 @dataclass
@@ -83,7 +83,11 @@ def execute_manual_plan_review_reader(
     실패 시 API 호출 없이 NEEDS_HUMAN_REVIEW 반환.
     """
     # 1. 사전 검증
-    # a. 세션 ID 대조
+    # a. 세션 ID 형식 및 대조
+    if not RealJulesAdapter.validate_session_resource_name(review_request.session_id):
+        return PlanReviewResult(status="NEEDS_HUMAN_REVIEW", reason_code="INVALID_SESSION_ID_FORMAT")
+    if not RealJulesAdapter.validate_session_resource_name(session_response.session_id):
+        return PlanReviewResult(status="NEEDS_HUMAN_REVIEW", reason_code="INVALID_SESSION_ID_FORMAT")
     if review_request.session_id != session_response.session_id:
         return PlanReviewResult(status="NEEDS_HUMAN_REVIEW", reason_code="SESSION_ID_MISMATCH")
 
@@ -107,12 +111,14 @@ def execute_manual_plan_review_reader(
 
     if not contract.plan_approval_required:
         return PlanReviewResult(status="NEEDS_HUMAN_REVIEW", reason_code="PLAN_APPROVAL_NOT_REQUIRED")
+    if contract.auto_merge:
+        return PlanReviewResult(status="NEEDS_HUMAN_REVIEW", reason_code="AUTO_MERGE_NOT_ALLOWED")
 
     # e. 정규화 및 해시 대조
     try:
         _, computed_contract_hash = canonicalize_contract(contract)
         _, computed_scope_hash = canonicalize_scope(contract.allowed_paths, contract.forbidden_paths)
-    except ScopeCanonicalizationError:
+    except (ScopeCanonicalizationError, TypeError, ValueError, AttributeError):
         return PlanReviewResult(status="NEEDS_HUMAN_REVIEW", reason_code="SCOPE_CANONICALIZATION_FAILED")
 
     if review_request.contract_hash != computed_contract_hash:

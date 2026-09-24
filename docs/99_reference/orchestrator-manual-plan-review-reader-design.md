@@ -10,11 +10,11 @@ Codex가 Jules 세션의 최신 Plan 원문을 정확히 일회 조회하여 검
 ## 3. PR 이전 단계 검증 및 1:1:1 결속 유예
 - **최종 결속 유예**: PR 생성 이전 단계에서 호출되므로, 최종 1:1:1 결속(Session:Branch:PR) 확인은 유예됩니다 (PR이 없으므로 검증 불가).
 - **사전 검증 항목**:
-  - 외부에서 주입된 세션 ID와 `JulesSessionResponse` 내 `session_id`의 일치 여부
+  - 외부에서 주입된 세션 ID와 `JulesSessionResponse` 내 `session_id`의 일치 및 포맷 검사
   - `JulesSessionResponse` 내 `task_id`와 Contract의 `task_id` 일치 여부
-  - Contract의 `base_commit_sha` 검증
-  - Contract의 `plan_approval_required == True` 설정 확인
-  - 승인 증적 상태 검증
+  - Contract의 `base_commit_sha` 검증 (해시 검증에 포함된 Contract 값과 Dispatcher의 사전 main SHA 검증을 통해 보장된다)
+  - Contract의 `plan_approval_required == True` 및 `auto_merge == False` 설정 확인
+  - 승인 증적 상태 검증 및 해시 무결성 검증
 - **오류 처리**: 위 조건 중 하나라도 충족하지 못하면 외부 API 조회 없이 즉시 `NEEDS_HUMAN_REVIEW`를 반환합니다.
 
 ## 4. 단일 Plan 이벤트 키 확정 원칙
