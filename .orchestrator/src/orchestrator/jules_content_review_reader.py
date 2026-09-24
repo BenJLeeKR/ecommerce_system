@@ -10,7 +10,12 @@ from typing import Any, Dict, List, Optional
 from datetime import datetime
 
 from .canonicalization import canonicalize_scope, canonicalize_contract, ScopeCanonicalizationError
-from .jules_adapter import JulesAdapter, JulesSessionResponse
+from .jules_adapter import (
+    ContentReviewFetchError,
+    JulesAdapter,
+    JulesSessionResponse,
+    TransportError,
+)
 from .validator import ApprovalEvidence, TaskContract
 
 
@@ -103,7 +108,25 @@ def fetch_content_review_activities(
     if not hasattr(adapter, "fetch_raw_activities_for_content_review"):
         return _fail("UNSUPPORTED_ADAPTER")
 
-    raw_activities = adapter.fetch_raw_activities_for_content_review(session_id)
+    try:
+        raw_activities = adapter.fetch_raw_activities_for_content_review(session_id)
+    except (TransportError, ContentReviewFetchError) as error:
+        allowed_reason_codes = {
+            "AUTHENTICATION_FAILED",
+            "HTTP_CONNECTION_FAILED",
+            "TIMEOUT_EXCEEDED",
+            "INVALID_RESPONSE_FORMAT",
+            "INVALID_ACTIVITIES_LIST_FORMAT",
+            "INVALID_EVENT_STRUCTURE",
+            "INTERNAL_CONTENT_REVIEW_FAILURE",
+        }
+        reason_code = getattr(error, "reason_code", None)
+        if reason_code in allowed_reason_codes:
+            return _fail(reason_code)
+        return _fail("INTERNAL_CONTENT_REVIEW_FAILURE")
+    except Exception:
+        return _fail("INTERNAL_CONTENT_REVIEW_FAILURE")
+
     if raw_activities is None:
         return _fail("RAW_ACTIVITIES_FETCH_FAILED")
 

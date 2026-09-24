@@ -2,7 +2,12 @@ import unittest
 from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 
-from orchestrator.jules_adapter import JulesSessionResponse, TransportError, RealJulesAdapter
+from orchestrator.jules_adapter import (
+    ContentReviewFetchError,
+    JulesSessionResponse,
+    TransportError,
+    RealJulesAdapter,
+)
 from orchestrator.validator import ApprovalEvidence, TaskContract
 from orchestrator.jules_content_review_reader import ReviewActivity, fetch_content_review_activities
 
@@ -337,6 +342,60 @@ class TestJulesContentReviewReader(unittest.TestCase):
             from orchestrator import ReviewActivity, fetch_content_review_activities
         except ImportError:
             self.fail("Failed to import ReviewActivity or fetch_content_review_activities from orchestrator")
+
+
+    def test_safe_adapter_errors_are_converted_without_text_exposure(self):
+        c = default_contract()
+        e = default_evidence()
+        sr = default_session_resp()
+
+        for error, reason_code in (
+            (TransportError("AUTHENTICATION_FAILED"), "AUTHENTICATION_FAILED"),
+            (TransportError("HTTP_CONNECTION_FAILED"), "HTTP_CONNECTION_FAILED"),
+            (TransportError("TIMEOUT_EXCEEDED", "sensitive transport text"), "TIMEOUT_EXCEEDED"),
+            (TransportError("INVALID_RESPONSE_FORMAT"), "INVALID_RESPONSE_FORMAT"),
+            (ContentReviewFetchError("INVALID_ACTIVITIES_LIST_FORMAT"), "INVALID_ACTIVITIES_LIST_FORMAT"),
+            (ContentReviewFetchError("INVALID_EVENT_STRUCTURE"), "INVALID_EVENT_STRUCTURE"),
+            (ContentReviewFetchError("INTERNAL_CONTENT_REVIEW_FAILURE"), "INTERNAL_CONTENT_REVIEW_FAILURE"),
+        ):
+            with self.subTest(reason_code=reason_code):
+                adapter = Mock()
+                adapter.fetch_raw_activities_for_content_review.side_effect = error
+
+                result = fetch_content_review_activities(adapter, "sessions/test-1", c, e, sr)
+
+                self.assertEqual(result, {"status": "NEEDS_HUMAN_REVIEW", "reason_code": reason_code})
+                self.assertEqual(adapter.fetch_raw_activities_for_content_review.call_count, 1)
+                self.assertNotIn("sensitive transport text", str(result))
+
+    def test_unexpected_adapter_error_uses_fixed_safe_reason_code(self):
+        adapter = Mock()
+        adapter.fetch_raw_activities_for_content_review.side_effect = RuntimeError("sensitive unexpected text")
+
+        result = fetch_content_review_activities(
+            adapter, "sessions/test-1", default_contract(), default_evidence(), default_session_resp()
+        )
+
+        self.assertEqual(
+            result,
+            {"status": "NEEDS_HUMAN_REVIEW", "reason_code": "INTERNAL_CONTENT_REVIEW_FAILURE"},
+        )
+        self.assertEqual(adapter.fetch_raw_activities_for_content_review.call_count, 1)
+        self.assertNotIn("sensitive unexpected text", str(result))
+
+    def test_none_fallback_remains_compatible(self):
+        adapter = Mock()
+        adapter.fetch_raw_activities_for_content_review.return_value = None
+
+        result = fetch_content_review_activities(
+            adapter, "sessions/test-1", default_contract(), default_evidence(), default_session_resp()
+        )
+
+        self.assertEqual(
+            result,
+            {"status": "NEEDS_HUMAN_REVIEW", "reason_code": "RAW_ACTIVITIES_FETCH_FAILED"},
+        )
+        self.assertEqual(adapter.fetch_raw_activities_for_content_review.call_count, 1)
 
 if __name__ == '__main__':
     unittest.main()
