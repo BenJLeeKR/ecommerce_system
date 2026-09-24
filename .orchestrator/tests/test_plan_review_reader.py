@@ -1,9 +1,12 @@
 import unittest
 import copy
+from typing import Dict, Optional, Any
 from orchestrator.plan_review_reader import execute_manual_plan_review_reader, PlanReviewResult, ManualReviewRequest
 from orchestrator.models import TaskContract, ApprovalEvidence
 from orchestrator.jules_adapter import JulesSessionResponse
 from orchestrator.canonicalization import canonicalize_contract, canonicalize_scope
+from orchestrator.jules_adapter import JulesHttpTransport, RealJulesAdapter, TransportError
+import unittest.mock
 
 class DummyAdapter:
     def __init__(self, plan_text=None, should_fail=False):
@@ -16,6 +19,15 @@ class DummyAdapter:
         if self.should_fail:
             raise Exception("API error")
         return self.plan_text
+
+class FakeJulesHttpTransportForPlan(JulesHttpTransport):
+    def __init__(self):
+        self.responses = {}
+    def request(self, method: str, path: str, headers: Dict[str, str], body: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        key = f"{method} {path}"
+        if key in self.responses:
+            return self.responses[key]
+        return {}
 
 class TestPlanReviewReader(unittest.TestCase):
     def setUp(self):
@@ -287,21 +299,6 @@ class TestPlanReviewReader(unittest.TestCase):
         self.assertNotIn("sess", str(req))
         self.assertEqual(req.to_dict()["review_request"], "<REDACTED>")
 
-if __name__ == '__main__':
-    unittest.main()
-
-from typing import Dict, Optional, Any
-from orchestrator.jules_adapter import JulesHttpTransport, RealJulesAdapter, TransportError
-
-class FakeJulesHttpTransportForPlan(JulesHttpTransport):
-    def __init__(self):
-        self.responses = {}
-    def request(self, method: str, path: str, headers: Dict[str, str], body: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        key = f"{method} {path}"
-        if key in self.responses:
-            return self.responses[key]
-        return {}
-
 class TestJulesAdapterFetchPlanTextOnly(unittest.TestCase):
     def setUp(self) -> None:
         self.transport = FakeJulesHttpTransportForPlan()
@@ -378,3 +375,9 @@ class TestJulesAdapterFetchPlanTextOnly(unittest.TestCase):
         self.transport.request = error_req
         res = self.adapter.fetch_plan_text_only("sessions/ses-1")
         self.assertIsNone(res)
+
+if __name__ == '__main__':
+    unittest.main()
+
+if __name__ == '__main__':
+    unittest.main()
