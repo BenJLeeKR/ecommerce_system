@@ -23,4 +23,4 @@ Codex가 Jules 세션의 최신 Plan 원문을 일회성으로 조회하고 검�
    - 객체 직렬화 시 원문이 노출되지 않는(마스킹) 비영속 경계 방어 로직 반영.
 
 ## 3. 참조 문서
-- [orchestrator-manual-plan-review-reader-design.md](../99_reference/orchestrator-manual-plan-review-reader-design.md)
+- [orchestrator-manual-plan-review-reader-design.md](../../99_reference/orchestrator-manual-plan-review-reader-design.md)

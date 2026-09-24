@@ -376,8 +376,6 @@ class TestJulesAdapterFetchPlanTextOnly(unittest.TestCase):
         res = self.adapter.fetch_plan_text_only("sessions/ses-1")
         self.assertIsNone(res)
 
-if __name__ == '__main__':
-    unittest.main()
 
 if __name__ == '__main__':
     unittest.main()
