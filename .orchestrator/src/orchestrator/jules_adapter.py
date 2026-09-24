@@ -817,6 +817,123 @@ class RealJulesAdapter(JulesAdapter):
 
         return response
 
+    def fetch_activities_content_only(self, session_resource_name: str) -> Optional[str]:
+        """GET /sessions/{session_resource_name}/activities 연동 (허용된 활동의 원문 전용 조회).
+
+        이 메서드는 jules_content_review_reader 전용 좁은 경계로서,
+        명시적으로 허용된 이벤트 유형(agentMessaged, planGenerated, progressUpdated, sessionCompleted, sessionFailed)의
+        단일 확인 필드만 추출하여 반환합니다.
+        userMessaged, 자격 증명, Source Resource Name 등의 메타데이터는 철저히 배제됩니다.
+        시간 순서 신뢰 불가, 미확인 유형/필드 구조, 파싱 실패 등의 불확실한 상황에서는
+        안전하게 None을 반환하여 상위에서 NEEDS_HUMAN_REVIEW 처리되도록 합니다.
+        """
+        if not self.validate_session_resource_name(session_resource_name):
+            return None
+
+        try:
+            res = self._transport.request(
+                method="GET",
+                path=f"{session_resource_name}/activities",
+                headers=self._get_headers(),
+            )
+            if not isinstance(res, dict):
+                return None
+
+            raw_activities = res.get("activities", [])
+            if not isinstance(raw_activities, list):
+                return None
+
+            # 시간 정렬 검증 (get_activities와 동일한 기준 적용)
+            parsed_activities = []
+            for act in raw_activities:
+                if not isinstance(act, dict):
+                    return None
+
+                create_time_str = act.get("createTime")
+                if not create_time_str or not isinstance(create_time_str, str):
+                    return None
+
+                try:
+                    dt = datetime.fromisoformat(create_time_str.replace('Z', '+00:00'))
+                    parsed_activities.append((dt, act))
+                except (ValueError, TypeError):
+                    return None
+
+            times = [dt for dt, _ in parsed_activities]
+            if len(times) != len(set(times)):
+                return None
+
+            parsed_activities.sort(key=lambda x: x[0])
+
+            content_lines = []
+            for dt, act in parsed_activities:
+                # 명시적 Allowlist 검사 및 추출
+                if "agentMessaged" in act:
+                    val = act["agentMessaged"]
+                    if not isinstance(val, dict) or "message" not in val or not isinstance(val["message"], str):
+                        return None
+                    content_lines.append(f"[AGENT_MESSAGED]\n{val['message']}")
+                elif "planGenerated" in act:
+                    val = act["planGenerated"]
+                    if not isinstance(val, dict) or "plan" not in val:
+                        return None
+                    plan_data = val["plan"]
+                    if isinstance(plan_data, dict) and "steps" in plan_data:
+                        steps = plan_data["steps"]
+                        if isinstance(steps, list) and len(steps) > 0:
+                            valid_steps = []
+                            is_valid = True
+                            for step in steps:
+                                if not isinstance(step, dict):
+                                    is_valid = False
+                                    break
+                                title = step.get("title")
+                                desc = step.get("description")
+                                if not isinstance(title, str) or not isinstance(desc, str):
+                                    is_valid = False
+                                    break
+                                valid_steps.append(f"{title}\n{desc}")
+                            if is_valid:
+                                content_lines.append(f"[PLAN_GENERATED]\n" + "\n\n".join(valid_steps))
+                            else:
+                                return None
+                        else:
+                            return None
+                    else:
+                        return None
+                elif "progressUpdated" in act:
+                    val = act["progressUpdated"]
+                    if not isinstance(val, dict) or "message" not in val or not isinstance(val["message"], str):
+                        return None
+                    content_lines.append(f"[PROGRESS_UPDATED]\n{val['message']}")
+                elif "sessionCompleted" in act:
+                    val = act["sessionCompleted"]
+                    if not isinstance(val, dict) or "summary" not in val or not isinstance(val["summary"], str):
+                        return None
+                    content_lines.append(f"[SESSION_COMPLETED]\n{val['summary']}")
+                elif "sessionFailed" in act:
+                    val = act["sessionFailed"]
+                    if not isinstance(val, dict) or "failureReason" not in val or not isinstance(val["failureReason"], str):
+                        return None
+                    content_lines.append(f"[SESSION_FAILED]\n{val['failureReason']}")
+                elif "userMessaged" in act:
+                    # userMessaged는 의도적으로 내용 배제 (무시)
+                    pass
+                elif "planApproved" in act:
+                    # 구조가 없으므로 무시
+                    pass
+                else:
+                    # 미확인 유형 발생 시 실패(None 반환)
+                    return None
+
+            if not content_lines:
+                return None
+
+            return "\n\n---\n\n".join(content_lines)
+
+        except Exception:
+            return None
+
     def fetch_plan_text_only(self, session_resource_name: str) -> Optional[str]:
         """GET /sessions/{session_resource_name}/activities 연동 (Plan 원문 전용 조회).
 

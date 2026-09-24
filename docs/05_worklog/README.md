@@ -41,3 +41,4 @@
 - [WL-0038](WL-0038-2026-09-24-orchestrator-manual-plan-review-reader.md) — 수동 Plan 검토 조회 인터페이스를 구현하고 비영속 원칙 및 1:1:1 결속 유예 기준을 정립했다.
 - [WL-0039](WL-0039-2026-09-24-orchestrator-manual-plan-reader-live-poc.md) — 수동 Plan 조회 Live POC의 비민감 성공 절차, 검증 경계, 제한 사항을 문서화했다.
 - [WL-0040](WL-0040-2026-09-24-orchestrator-manual-plan-payload-alignment.md) — 수동 Plan 조회 페이로드를 실제 planGenerated.plan.steps 객체 구조에 맞게 정합화하고 엄격한 예외 검증을 추가했다.
+ - [WL-0042](WL-0042-2024-10-27-jules-content-handoff.md): Jules 수동 콘텐츠 인계 구현

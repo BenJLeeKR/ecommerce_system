@@ -58,6 +58,7 @@ from .review_entrypoint import execute_review_handoff_with_repository
 
 from .dispatch_entrypoint import execute_dispatch_session
 from .plan_review_reader import execute_manual_plan_review_reader, PlanReviewResult, ManualReviewRequest
+from .jules_content_review_reader import execute_content_handoff, ContentReviewResult, ContentReviewRequest
 
 __all__ = [
     "PathItem",
@@ -105,4 +106,7 @@ __all__ = [
     "execute_manual_plan_review_reader",
     "PlanReviewResult",
     "ManualReviewRequest",
+    "execute_content_handoff",
+    "ContentReviewResult",
+    "ContentReviewRequest",
 ]
