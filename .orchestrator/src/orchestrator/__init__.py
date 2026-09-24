@@ -16,6 +16,8 @@ from .models import (
     PersistentSessionBinding,
 )
 
+from .jules_content_review_reader import ReviewActivity, fetch_content_review_activities
+
 from .markdown_parser import parse_task_contract_markdown
 from .canonicalization import canonicalize_contract, canonicalize_scope, ScopeCanonicalizationError
 from .validator import (
@@ -62,6 +64,8 @@ from .plan_review_reader import execute_manual_plan_review_reader, PlanReviewRes
 __all__ = [
     "PathItem",
     "TaskContract",
+    "ReviewActivity",
+    "fetch_content_review_activities",
     "ApprovalEvidence",
     "ApprovalHistoryItem",
     "TaskRecord",
