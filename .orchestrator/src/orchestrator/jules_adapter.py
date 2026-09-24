@@ -9,7 +9,7 @@ import urllib.request
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Callable
+from typing import Any, Dict, List, Optional, Callable, Tuple
 from .models import PathItem
 from .canonicalization import canonicalize_scope, ScopeCanonicalizationError
 
@@ -172,6 +172,13 @@ class JulesAdapter(ABC):
         self, session_id: str, reason_code: str = "SESSION_CANCELLED"
     ) -> JulesSessionResponse:
         """세션을 명시적으로 취소 상태로 전이합니다."""
+        pass
+
+    @abstractmethod
+    def fetch_raw_activities_for_content_review(
+        self, session_resource_name: str
+    ) -> Optional[List[Tuple[datetime, Dict[str, Any]]]]:
+        """jules_content_review_reader 전용 수동 조회 경계."""
         pass
 
 
@@ -444,6 +451,11 @@ class FakeJulesAdapter(JulesAdapter):
             to_status="CANCELLED",
             reason_code=reason_code,
         )
+
+    def fetch_raw_activities_for_content_review(
+        self, session_resource_name: str
+    ) -> Optional[List[Tuple[datetime, Dict[str, Any]]]]:
+        return None
 
 
 # --- Jules REST API v1alpha 전송 계층 및 실제 어댑터 구현 ---
@@ -896,6 +908,48 @@ class RealJulesAdapter(JulesAdapter):
 
             return latest_plan_text
 
+        except Exception:
+            return None
+
+    def fetch_raw_activities_for_content_review(
+        self, session_resource_name: str
+    ) -> Optional[List[Tuple[datetime, Dict[str, Any]]]]:
+        """jules_content_review_reader 전용 좁은 수동 조회 경계."""
+        if not self.validate_session_resource_name(session_resource_name):
+            return None
+
+        try:
+            res = self._transport.request(
+                method="GET",
+                path=f"{session_resource_name}/activities",
+                headers=self._get_headers(),
+            )
+            if not isinstance(res, dict):
+                return None
+
+            raw_activities = res.get("activities", [])
+            if not isinstance(raw_activities, list):
+                return None
+
+            parsed_activities = []
+            for act in raw_activities:
+                if not isinstance(act, dict):
+                    return None
+                create_time_str = act.get("createTime")
+                if not create_time_str or not isinstance(create_time_str, str):
+                    return None
+                try:
+                    dt = datetime.fromisoformat(create_time_str.replace('Z', '+00:00'))
+                    parsed_activities.append((dt, act))
+                except (ValueError, TypeError):
+                    return None
+
+            times = [dt for dt, _ in parsed_activities]
+            if len(times) != len(set(times)):
+                return None
+
+            parsed_activities.sort(key=lambda x: x[0])
+            return parsed_activities
         except Exception:
             return None
 

@@ -62,6 +62,8 @@ from .plan_review_reader import execute_manual_plan_review_reader, PlanReviewRes
 __all__ = [
     "PathItem",
     "TaskContract",
+    "ReviewActivity",
+    "fetch_content_review_activities",
     "ApprovalEvidence",
     "ApprovalHistoryItem",
     "TaskRecord",
