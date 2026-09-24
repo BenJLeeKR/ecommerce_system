@@ -194,17 +194,19 @@ class TestJulesContentReviewReader(unittest.TestCase):
         self.assertEqual(activities[3].activity_type, "PLAN_APPROVED")
         self.assertIsNone(activities[3].title)
         self.assertIsNone(activities[3].description)
+        self.assertIsNone(activities[3].create_time_utc)
 
         # 5. sessionCompleted 검증 (메타데이터 노출 안함)
         self.assertEqual(activities[4].activity_type, "SESSION_COMPLETED")
         self.assertIsNone(activities[4].title)
+        self.assertIsNone(activities[4].create_time_utc)
 
         # 6. agentMessaged 검증
         self.assertEqual(activities[5].activity_type, "AGENT_MESSAGED")
         self.assertEqual(activities[5].agent_message, "Hello from agent")
 
-    def test_aborts_on_user_message(self):
-        """사용자 메시지가 포함되어 있으면 대체 탐색 없이 즉시 NEEDS_HUMAN_REVIEW 반환"""
+    def test_skips_user_message(self):
+        """userMessaged는 읽지 않고 건너뛰며 정상 조회 성공"""
         c = default_contract()
         e = default_evidence()
         sr = default_session_resp()
@@ -226,8 +228,10 @@ class TestJulesContentReviewReader(unittest.TestCase):
 
         res = fetch_content_review_activities(adapter, "sessions/test-1", c, e, sr)
         self.assertIsNotNone(res)
-        self.assertEqual(res.get("status"), "NEEDS_HUMAN_REVIEW")
-        self.assertIn("reason_code", res)
+        self.assertEqual(res.get("status"), "SUCCESS")
+        activities = res.get("activities", [])
+        self.assertEqual(len(activities), 1)
+        self.assertEqual(activities[0].activity_type, "PLAN_GENERATED")
 
     def test_aborts_on_unverified_or_format_errors(self):
         """형식 오류, 시간 순서 오류, 미확인 이벤트 시 NEEDS_HUMAN_REVIEW 반환"""
@@ -274,14 +278,28 @@ class TestJulesContentReviewReader(unittest.TestCase):
     @patch("sqlite3.connect")
     @patch("builtins.open")
     def test_non_persistence_and_no_leakage(self, mock_open, mock_sqlite, mock_log_err, mock_log_info):
-        """비영속, 비로그, 비직렬화(민감정보 마스킹) 검증"""
-        act = ReviewActivity(
-            activity_type="PLAN_GENERATED",
-            create_time_utc="2026-09-24T00:01:00Z",
-            title="Secret Title",
-            description="Secret Desc",
-            agent_message="Secret Agent"
-        )
+        """비영속, 비로그, 비직렬화(민감정보 마스킹) 실제 조회 경로 검증"""
+        c = default_contract()
+        e = default_evidence()
+        sr = default_session_resp()
+
+        response_data = {
+            "activities": [
+                {
+                    "createTime": "2026-09-24T00:01:00Z",
+                    "planGenerated": { "plan": { "steps": [{"title": "Secret Title", "description": "Secret Desc"}] } }
+                }
+            ]
+        }
+        transport = FakeHttpTransport(response_data=response_data)
+        adapter = RealJulesAdapter(api_key="fake-key", transport=transport)
+
+        res = fetch_content_review_activities(adapter, "sessions/test-1", c, e, sr)
+        self.assertEqual(res.get("status"), "SUCCESS")
+
+        activities = res.get("activities", [])
+        self.assertEqual(len(activities), 1)
+        act = activities[0]
 
         # 1. str, repr 변환 시 REDACTED 여부
         act_str = str(act)
@@ -289,19 +307,15 @@ class TestJulesContentReviewReader(unittest.TestCase):
 
         self.assertNotIn("Secret Title", act_str)
         self.assertNotIn("Secret Desc", act_str)
-        self.assertNotIn("Secret Agent", act_str)
         self.assertIn("<REDACTED>", act_str)
 
         self.assertNotIn("Secret Title", act_repr)
         self.assertNotIn("Secret Desc", act_repr)
-        self.assertNotIn("Secret Agent", act_repr)
         self.assertIn("<REDACTED>", act_repr)
 
         # 2. to_dict 변환 시 REDACTED 여부
         act_dict = act.to_dict()
         self.assertEqual(act_dict["title"], "<REDACTED>")
-        self.assertEqual(act_dict["description"], "<REDACTED>")
-        self.assertEqual(act_dict["agent_message"], "<REDACTED>")
         self.assertEqual(act_dict["activity_type"], "PLAN_GENERATED")
 
         # 3. 로깅 및 파일/DB 접근 모의객체가 호출되지 않았는지 검증
@@ -310,6 +324,13 @@ class TestJulesContentReviewReader(unittest.TestCase):
         mock_sqlite.assert_not_called()
         mock_open.assert_not_called()
 
+
+    def test_package_exports(self):
+        """__init__.py에서 올바르게 export되었는지 검증"""
+        try:
+            from orchestrator import ReviewActivity, fetch_content_review_activities
+        except ImportError:
+            self.fail("Failed to import ReviewActivity or fetch_content_review_activities from orchestrator")
 
 if __name__ == '__main__':
     unittest.main()

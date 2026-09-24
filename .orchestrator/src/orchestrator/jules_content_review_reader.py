@@ -22,7 +22,7 @@ class ReviewActivity:
     실제 민감 원문 내용을 <REDACTED> 처리하여 유출을 방지합니다.
     """
     activity_type: str
-    create_time_utc: str
+    create_time_utc: Optional[str] = field(default=None)
     # 텍스트가 없는 완료/승인 이벤트 등은 None
     title: Optional[str] = field(default=None)
     description: Optional[str] = field(default=None)
@@ -182,14 +182,14 @@ def fetch_content_review_activities(
 
         elif event_type == "planApproved":
             parsed_activities.append(ReviewActivity(
-                activity_type="PLAN_APPROVED",
-                create_time_utc=create_time_utc
+                activity_type="PLAN_APPROVED"
+                # create_time_utc 등 메타데이터 미포함
             ))
 
         elif event_type == "sessionCompleted":
             parsed_activities.append(ReviewActivity(
-                activity_type="SESSION_COMPLETED",
-                create_time_utc=create_time_utc
+                activity_type="SESSION_COMPLETED"
+                # create_time_utc 등 메타데이터 미포함
             ))
 
         else:

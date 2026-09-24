@@ -20,7 +20,7 @@
    - `planGenerated`: `plan.steps` 배열의 `title`(필수), `description`(선택) 텍스트 결합 반환.
    - `progressUpdated`: `title`(필수), `description`(선택) 반환.
    - `planApproved` / `sessionCompleted`: 본문(텍스트)이 없으므로 식별자·메타데이터 없이 활동 유형 표식만 반환.
-   - `sessionFailed` 등 본문이 아직 규명되지 않은 이벤트나 `userMessaged` (사용자 민감 정보)는 대체 탐색 없이 즉시 조회 중단(NEEDS_HUMAN_REVIEW 반환).
+   - `sessionFailed` 등 본문이 아직 규명되지 않은 이벤트는 즉시 조회 중단(NEEDS_HUMAN_REVIEW 반환). `userMessaged` (사용자 민감 정보)는 원문 반환 없이 건너뜀.
 
 3. **자동화 금지**:
    - 자동 승인, 자동 검토, 자동 Plan 승인 기능은 제공하지 않습니다. (수동 조회 용도 한정)

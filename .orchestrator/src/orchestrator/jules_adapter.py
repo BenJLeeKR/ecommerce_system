@@ -950,6 +950,9 @@ class RealJulesAdapter(JulesAdapter):
                     return None
 
                 event_type = union_keys[0]
+                if event_type == "userMessaged":
+                    # 민감 정보 방지: 건너뜀 (안전한 경계)
+                    continue
                 if event_type not in allowed_events:
                     return None
 

@@ -11,7 +11,7 @@ Jules 세션에 저장된 활동 이벤트(특히 `planGenerated` 등)의 원시
 1. **수동 조회용 모듈 추가**: `.orchestrator/src/orchestrator/jules_content_review_reader.py` 생성.
    - 사전 검증(`ACTIVE`, `plan_approval_required=True`, `auto_merge=False` 등)을 철저히 수행하고, 실패 시 어댑터/API 호출 0회를 보장함.
    - `planGenerated`, `agentMessaged`, `progressUpdated` 이벤트에서 허용된 필드만 추출하며 `description` 누락을 허용함.
-   - 텍스트가 없는 `planApproved`, `sessionCompleted`는 메타데이터 없이 활동 표식만 반환. 미확인 이벤트 및 형식 오류 발견 시 즉각 조회를 차단(NEEDS_HUMAN_REVIEW)함.
+   - 텍스트가 없는 `planApproved`, `sessionCompleted`는 create_time_utc 등 메타데이터 없이 활동 표식만 반환. 미확인 이벤트 및 형식 오류 발견 시 즉각 조회를 차단(NEEDS_HUMAN_REVIEW)하며, userMessaged는 기록·반환 없이 안전하게 건너뜀.
 2. **어댑터 기능 추가**: `.orchestrator/src/orchestrator/jules_adapter.py`
    - `fetch_raw_activities_for_content_review()` 메서드를 추가하여 안전한 원문 데이터 전달 경계를 확보함. 기존 `ActivitySummary`에는 영향을 주지 않음.
 3. **보안 및 정책 준수**:
