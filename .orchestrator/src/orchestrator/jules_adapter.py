@@ -817,6 +817,72 @@ class RealJulesAdapter(JulesAdapter):
 
         return response
 
+    def fetch_plan_text_only(self, session_resource_name: str) -> Optional[str]:
+        """GET /sessions/{session_resource_name}/activities 연동 (Plan 원문 전용 조회).
+
+        이 메서드는 plan_review_reader 전용 좁은 경계로서, 최신 planGenerated 이벤트의
+        'plan' 필드 내 원문만을 반환합니다. 일반적인 ActivitySummary나 구조화 결과에는
+        포함되지 않으며, 비영속/비로그 호출을 전제로 설계되었습니다.
+        단일 키 'plan'에서 문자열 텍스트를 추출하며, 불확실한 경우(파싱 실패, 시간 순서 신뢰 불가 등)
+        None을 반환하여 상위에서 NEEDS_HUMAN_REVIEW 처리하도록 합니다.
+        """
+        if not self.validate_session_resource_name(session_resource_name):
+            return None
+
+        try:
+            res = self._transport.request(
+                method="GET",
+                path=f"{session_resource_name}/activities",
+                headers=self._get_headers(),
+            )
+            if not isinstance(res, dict):
+                return None
+
+            raw_activities = res.get("activities", [])
+            if not isinstance(raw_activities, list):
+                return None
+
+            # 시간 정렬 검증 (get_activities와 동일한 기준 적용)
+            parsed_activities = []
+            for act in raw_activities:
+                if not isinstance(act, dict):
+                    return None
+
+                create_time_str = act.get("createTime")
+                if not create_time_str or not isinstance(create_time_str, str):
+                    return None
+
+                try:
+                    dt = datetime.fromisoformat(create_time_str.replace('Z', '+00:00'))
+                    parsed_activities.append((dt, act))
+                except (ValueError, TypeError):
+                    return None
+
+            times = [dt for dt, _ in parsed_activities]
+            if len(times) != len(set(times)):
+                return None
+
+            parsed_activities.sort(key=lambda x: x[0])
+
+            # 최신 planGenerated 이벤트 찾기 (뒤에서부터 탐색)
+            latest_plan_text = None
+            for _, act in reversed(parsed_activities):
+                if "planGenerated" in act:
+                    plan_gen_data = act["planGenerated"]
+                    if not isinstance(plan_gen_data, dict):
+                        return None
+                    # 정확한 단일 키 'plan' 확인. (다른 키 추정 금지)
+                    if "plan" in plan_gen_data:
+                        plan_data = plan_gen_data["plan"]
+                        if isinstance(plan_data, str):
+                            latest_plan_text = plan_data
+                    break
+
+            return latest_plan_text
+
+        except Exception:
+            return None
+
     def get_activities(self, session_resource_name: str) -> ActivitySummary:
         """GET /sessions/{session_resource_name}/activities 연동.
 
