@@ -46,3 +46,4 @@
 - [WL-0043: Orchestrator 수동 콘텐츠 검토 진입점 구현](WL-0043-2026-09-24-orchestrator-manual-content-review-entrypoint.md) - 상태: 완료
 - [WL-0044](WL-0044-2026-09-24-orchestrator-content-review-safe-diagnostics.md) — 수동 콘텐츠 조회 실패를 원문 없이 안전 사유 코드로 분리하고 회귀 검증을 보강했다.
 - [WL-0045](WL-0045-2026-09-24-orchestrator-plan-session-registration.md) — Plan 단계 Jules 세션의 비민감 등록·조회 기반과 최종 1:1:1 결속 분리 기준을 추가했다.
+- [WL-0046](WL-0046-2026-09-25-orchestrator-plan-session-registration-integration.md) — Dispatch 성공 세션의 명시적 Plan 단계 등록 연결과 안전 실패 경계를 추가했다.
