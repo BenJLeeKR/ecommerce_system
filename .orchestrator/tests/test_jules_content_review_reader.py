@@ -256,6 +256,9 @@ class TestJulesContentReviewReader(unittest.TestCase):
             ("multiple union events", [
                 {"createTime": "2026-09-24T00:01:00Z", "planGenerated": {"plan": {"steps": [{"title": "1"}]}}, "progressUpdated": {"title": "2"}}
             ]),
+            ("multiple union with userMessaged", [
+                {"createTime": "2026-09-24T00:01:00Z", "planGenerated": {"plan": {"steps": [{"title": "1"}]}}, "userMessaged": {"userMessage": "secret"}}
+            ]),
             ("sessionFailed with unknown body", [
                 {"createTime": "2026-09-24T00:01:00Z", "sessionFailed": {"reason": "unknown"}}
             ]),

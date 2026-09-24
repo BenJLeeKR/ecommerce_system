@@ -937,7 +937,14 @@ class RealJulesAdapter(JulesAdapter):
                 if not isinstance(act, dict):
                     return None
 
-                if "userMessaged" in act:
+                # 복수 union 이벤트 및 금지 이벤트 필터링
+                union_keys = [k for k in act.keys() if k not in ("createTime", "name", "id", "metadata")]
+                if len(union_keys) != 1:
+                    return None
+
+                event_type = union_keys[0]
+                if event_type == "userMessaged":
+                    # 단일 union이 userMessaged인 경우에만 안전하게 건너뜀
                     continue
 
                 create_time_str = act.get("createTime")
@@ -948,12 +955,6 @@ class RealJulesAdapter(JulesAdapter):
                 except (ValueError, TypeError):
                     return None
 
-                # 복수 union 이벤트 및 금지 이벤트 필터링
-                union_keys = [k for k in act.keys() if k not in ("createTime", "name", "id", "metadata")]
-                if len(union_keys) != 1:
-                    return None
-
-                event_type = union_keys[0]
                 if event_type not in allowed_events:
                     return None
 
