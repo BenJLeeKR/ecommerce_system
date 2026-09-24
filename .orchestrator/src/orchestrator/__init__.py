@@ -60,7 +60,7 @@ from .review_entrypoint import execute_review_handoff_with_repository
 
 from .dispatch_entrypoint import execute_dispatch_session
 from .plan_review_reader import execute_manual_plan_review_reader, PlanReviewResult, ManualReviewRequest
-from .manual_content_review_entrypoint import execute_manual_content_review_reader
+from .manual_content_review_entrypoint import execute_manual_content_review_reader, ManualContentReviewRequest
 
 __all__ = [
     "PathItem",
@@ -111,4 +111,5 @@ __all__ = [
     "PlanReviewResult",
     "ManualReviewRequest",
     "execute_manual_content_review_reader",
+    "ManualContentReviewRequest",
 ]
