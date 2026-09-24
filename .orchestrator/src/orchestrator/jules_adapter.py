@@ -936,6 +936,10 @@ class RealJulesAdapter(JulesAdapter):
             for act in raw_activities:
                 if not isinstance(act, dict):
                     return None
+
+                if "userMessaged" in act:
+                    continue
+
                 create_time_str = act.get("createTime")
                 if not create_time_str or not isinstance(create_time_str, str):
                     return None
@@ -950,9 +954,6 @@ class RealJulesAdapter(JulesAdapter):
                     return None
 
                 event_type = union_keys[0]
-                if event_type == "userMessaged":
-                    # 민감 정보 방지: 건너뜀 (안전한 경계)
-                    continue
                 if event_type not in allowed_events:
                     return None
 

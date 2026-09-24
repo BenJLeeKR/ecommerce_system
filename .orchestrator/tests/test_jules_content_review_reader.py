@@ -218,8 +218,11 @@ class TestJulesContentReviewReader(unittest.TestCase):
                     "planGenerated": { "plan": { "steps": [{"title": "Step 1"}] } }
                 },
                 {
-                    "createTime": "2026-09-24T00:02:00Z",
                     "userMessaged": { "userMessage": "secret user data" }
+                },
+                {
+                    "userMessaged": { "userMessage": "another secret", "extra_field": 123 },
+                    "createTime": "invalid-time"
                 }
             ]
         }
