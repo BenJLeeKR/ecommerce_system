@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
+from .canonicalization import canonicalize_scope, canonicalize_contract, ScopeCanonicalizationError
 from .jules_adapter import JulesAdapter, JulesSessionResponse
 from .validator import ApprovalEvidence, TaskContract
 
@@ -57,7 +58,7 @@ def fetch_content_review_activities(
     contract: TaskContract,
     evidence: ApprovalEvidence,
     session_response: JulesSessionResponse
-) -> Optional[List[ReviewActivity]]:
+) -> Dict[str, Any]:
     """사전 검증 후 Jules 세션의 수동 검토용 원문 활동 목록을 조회합니다.
 
     [검증 규칙]
@@ -69,102 +70,108 @@ def fetch_content_review_activities(
 
     검증 실패 시 API 호출은 0회이며 즉시 None을 반환(상위에서 NEEDS_HUMAN_REVIEW 처리)합니다.
     """
+    def _fail(reason: str) -> Dict[str, Any]:
+        return {"status": "NEEDS_HUMAN_REVIEW", "reason_code": reason}
+
+    try:
+        _, computed_scope_hash = canonicalize_scope(contract.allowed_paths, contract.forbidden_paths)
+        _, computed_contract_hash = canonicalize_contract(contract)
+    except Exception:
+        return _fail("CANONICALIZATION_FAILED")
+
     if evidence.status != "ACTIVE":
-        return None
+        return _fail("EVIDENCE_NOT_ACTIVE")
+    if evidence.task_id != contract.task_id:
+        return _fail("EVIDENCE_TASK_ID_MISMATCH")
+    if evidence.contract_version != getattr(contract, "contract_version", None):
+        return _fail("EVIDENCE_CONTRACT_VERSION_MISMATCH")
+    if evidence.contract_hash != computed_contract_hash:
+        return _fail("EVIDENCE_CONTRACT_HASH_MISMATCH")
+    if evidence.approved_scope_hash != computed_scope_hash:
+        return _fail("EVIDENCE_SCOPE_HASH_MISMATCH")
+
     if not getattr(contract, "plan_approval_required", False):
-        return None
+        return _fail("PLAN_APPROVAL_NOT_REQUIRED")
     if getattr(contract, "auto_merge", True):
-        return None
+        return _fail("AUTO_MERGE_ENABLED")
     if contract.task_id != session_response.task_id:
-        return None
+        return _fail("SESSION_TASK_ID_MISMATCH")
     if session_id != session_response.session_id:
-        return None
+        return _fail("SESSION_ID_MISMATCH")
 
     # 사전 검증 통과 후 Adapter의 전용 메서드를 통해 원시 액티비티를 안전하게 조회
-    # (일반 summary 조회나 전제 조건 없는 API 호출을 방지)
     if not hasattr(adapter, "fetch_raw_activities_for_content_review"):
-        return None
+        return _fail("UNSUPPORTED_ADAPTER")
 
     raw_activities = adapter.fetch_raw_activities_for_content_review(session_id)
     if raw_activities is None:
-        return None
+        return _fail("RAW_ACTIVITIES_FETCH_FAILED")
 
     parsed_activities = []
 
     for dt, act in raw_activities:
         create_time_utc = dt.isoformat()
 
-        # 1. agentMessaged
-        if "agentMessaged" in act:
-            agent_data = act["agentMessaged"]
-            if not isinstance(agent_data, dict):
-                return None
-            msg = agent_data.get("agentMessage")
+        union_keys = [k for k in act.keys() if k not in ("createTime", "name", "id", "metadata")]
+        if len(union_keys) != 1:
+            return _fail("MULTIPLE_OR_ZERO_UNION_EVENTS")
+
+        event_type = union_keys[0]
+        event_data = act[event_type]
+
+        if not isinstance(event_data, dict):
+            return _fail("INVALID_EVENT_FORMAT")
+
+        if event_type == "agentMessaged":
+            msg = event_data.get("agentMessage")
             if not isinstance(msg, str):
-                return None
+                return _fail("INVALID_AGENT_MESSAGE")
             parsed_activities.append(ReviewActivity(
                 activity_type="AGENT_MESSAGED",
                 create_time_utc=create_time_utc,
                 agent_message=msg
             ))
-            continue
 
-        # 2. planGenerated
-        if "planGenerated" in act:
-            plan_gen_data = act["planGenerated"]
-            if not isinstance(plan_gen_data, dict) or "plan" not in plan_gen_data:
-                return None
-            plan_data = plan_gen_data["plan"]
+        elif event_type == "planGenerated":
+            if "plan" not in event_data:
+                return _fail("INVALID_PLAN_GENERATED_FORMAT")
+            plan_data = event_data["plan"]
             if not isinstance(plan_data, dict) or "steps" not in plan_data:
-                return None
+                return _fail("INVALID_PLAN_GENERATED_FORMAT")
             steps = plan_data["steps"]
             if not isinstance(steps, list) or len(steps) == 0:
-                return None
+                return _fail("INVALID_PLAN_GENERATED_FORMAT")
 
-            # steps의 모든 title(필수), description(선택) 추출
-            # 하나의 planGenerated에 대해 step들을 묶어서 텍스트화하거나 각각을 저장 (여기선 텍스트 결합 방식 사용)
-            combined_titles = []
-            combined_descs = []
-            is_valid = True
+            # title과 description 대응 관계 유지 (독립 결합 금지)
+            formatted_steps = []
             for step in steps:
                 if not isinstance(step, dict):
-                    is_valid = False
-                    break
+                    return _fail("INVALID_PLAN_GENERATED_FORMAT")
                 title = step.get("title")
                 if not isinstance(title, str):
-                    is_valid = False
-                    break
-                desc = step.get("description", "")
+                    return _fail("INVALID_PLAN_GENERATED_FORMAT")
+                desc = step.get("description")
                 if desc is not None and not isinstance(desc, str):
-                    is_valid = False
-                    break
+                    return _fail("INVALID_PLAN_GENERATED_FORMAT")
 
-                combined_titles.append(title)
                 if desc:
-                    combined_descs.append(desc)
-
-            if not is_valid:
-                return None
+                    formatted_steps.append(f"{title}\n{desc}")
+                else:
+                    formatted_steps.append(title)
 
             parsed_activities.append(ReviewActivity(
                 activity_type="PLAN_GENERATED",
                 create_time_utc=create_time_utc,
-                title="\n".join(combined_titles),
-                description="\n".join(combined_descs) if combined_descs else None
+                title="\n\n".join(formatted_steps),
             ))
-            continue
 
-        # 3. progressUpdated
-        if "progressUpdated" in act:
-            prog_data = act["progressUpdated"]
-            if not isinstance(prog_data, dict):
-                return None
-            title = prog_data.get("title")
+        elif event_type == "progressUpdated":
+            title = event_data.get("title")
             if not isinstance(title, str):
-                return None
-            desc = prog_data.get("description")
+                return _fail("INVALID_PROGRESS_UPDATED_FORMAT")
+            desc = event_data.get("description")
             if desc is not None and not isinstance(desc, str):
-                return None
+                return _fail("INVALID_PROGRESS_UPDATED_FORMAT")
 
             parsed_activities.append(ReviewActivity(
                 activity_type="PROGRESS_UPDATED",
@@ -172,31 +179,20 @@ def fetch_content_review_activities(
                 title=title,
                 description=desc
             ))
-            continue
 
-        # 4. planApproved (텍스트 없는 유형 표식만)
-        if "planApproved" in act:
-            # 원시 데이터가 dict인지 확인하지만 그 안의 세부 필드는 추출하지 않음
-            if not isinstance(act["planApproved"], dict):
-                return None
+        elif event_type == "planApproved":
             parsed_activities.append(ReviewActivity(
                 activity_type="PLAN_APPROVED",
                 create_time_utc=create_time_utc
             ))
-            continue
 
-        # 5. sessionCompleted (텍스트 없는 유형 표식만)
-        if "sessionCompleted" in act:
-            if not isinstance(act["sessionCompleted"], dict):
-                return None
+        elif event_type == "sessionCompleted":
             parsed_activities.append(ReviewActivity(
                 activity_type="SESSION_COMPLETED",
                 create_time_utc=create_time_utc
             ))
-            continue
 
-        # 그 외 식별되지 않은 이벤트(sessionFailed, userMessaged 등)나 형식이 불일치하는 경우
-        # (userMessaged는 민감 정보 노출 우려로 반환 거부, sessionFailed 등 미확인 필드는 추정 금지)
-        return None
+        else:
+            return _fail("UNSUPPORTED_OR_FORBIDDEN_EVENT")
 
-    return parsed_activities
+    return {"status": "SUCCESS", "activities": parsed_activities}

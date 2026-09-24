@@ -932,6 +932,7 @@ class RealJulesAdapter(JulesAdapter):
                 return None
 
             parsed_activities = []
+            allowed_events = {"agentMessaged", "planGenerated", "progressUpdated", "planApproved", "sessionCompleted"}
             for act in raw_activities:
                 if not isinstance(act, dict):
                     return None
@@ -940,9 +941,48 @@ class RealJulesAdapter(JulesAdapter):
                     return None
                 try:
                     dt = datetime.fromisoformat(create_time_str.replace('Z', '+00:00'))
-                    parsed_activities.append((dt, act))
                 except (ValueError, TypeError):
                     return None
+
+                # 복수 union 이벤트 및 금지 이벤트 필터링
+                union_keys = [k for k in act.keys() if k not in ("createTime", "name", "id", "metadata")]
+                if len(union_keys) != 1:
+                    return None
+
+                event_type = union_keys[0]
+                if event_type not in allowed_events:
+                    return None
+
+                event_data = act[event_type]
+                if not isinstance(event_data, dict):
+                    return None
+
+                # 허용된 필드만 추출하여 최소 typed 형태(dict)로 재구성
+                safe_act = {"createTime": create_time_str}
+                if event_type == "agentMessaged":
+                    safe_act["agentMessaged"] = {"agentMessage": event_data.get("agentMessage")}
+                elif event_type == "planGenerated":
+                    if "plan" in event_data and isinstance(event_data["plan"], dict) and "steps" in event_data["plan"]:
+                        safe_steps = []
+                        for step in event_data["plan"]["steps"]:
+                            if isinstance(step, dict):
+                                safe_step = {"title": step.get("title")}
+                                if "description" in step:
+                                    safe_step["description"] = step.get("description")
+                                safe_steps.append(safe_step)
+                        safe_act["planGenerated"] = {"plan": {"steps": safe_steps}}
+                    else:
+                        safe_act["planGenerated"] = {}
+                elif event_type == "progressUpdated":
+                    safe_act["progressUpdated"] = {"title": event_data.get("title")}
+                    if "description" in event_data:
+                        safe_act["progressUpdated"]["description"] = event_data.get("description")
+                elif event_type == "planApproved":
+                    safe_act["planApproved"] = {}
+                elif event_type == "sessionCompleted":
+                    safe_act["sessionCompleted"] = {}
+
+                parsed_activities.append((dt, safe_act))
 
             times = [dt for dt, _ in parsed_activities]
             if len(times) != len(set(times)):

@@ -48,8 +48,8 @@ def default_evidence():
         approval_id="APP-1",
         task_id="TASK-123",
         contract_version="1.0",
-        contract_hash="hash-123",
-        approved_scope_hash="scope-123",
+        contract_hash="e80c6b3a2b6e85891e7bda52ca61ed04935f5f706b24a6e5ccd3de1910eb40ac",
+        approved_scope_hash="a111896298b55d0a9e9e02bfe8598fe1e47cf1f72b42860953deae762baa1c21",
         approver="user1",
         approval_time_utc="2026-09-24T00:00:00Z",
         status="ACTIVE",
@@ -71,12 +71,14 @@ def default_session_resp():
 class TestJulesContentReviewReader(unittest.TestCase):
 
     def test_pre_gate_validation_failures_yield_zero_api_calls(self):
-        """사전 검증 실패 시 API 호출은 0회이고 None을 반환해야 함"""
+        """사전 검증 실패 시 API 호출은 0회이고 NEEDS_HUMAN_REVIEW를 반환해야 함"""
         cases = [
             ("evidence.status != ACTIVE", default_evidence, lambda e: setattr(e, "status", "EXPIRED")),
             ("plan_approval_required = False", default_contract, lambda c: setattr(c, "plan_approval_required", False)),
             ("auto_merge = True", default_contract, lambda c: setattr(c, "auto_merge", True)),
             ("task_id mismatch", default_contract, lambda c: setattr(c, "task_id", "TASK-999")),
+            ("contract hash mismatch", default_evidence, lambda e: setattr(e, "contract_hash", "wrong")),
+            ("scope hash mismatch", default_evidence, lambda e: setattr(e, "approved_scope_hash", "wrong")),
         ]
 
         for desc, factory, mutator in cases:
@@ -95,7 +97,9 @@ class TestJulesContentReviewReader(unittest.TestCase):
 
                 res = fetch_content_review_activities(adapter, "sessions/test-1", c, e, sr)
 
-                self.assertIsNone(res)
+                self.assertIsNotNone(res)
+                self.assertEqual(res.get("status"), "NEEDS_HUMAN_REVIEW")
+                self.assertIn("reason_code", res)
                 self.assertEqual(transport.call_count, 0)
 
         # session_id 불일치 케이스
@@ -108,11 +112,13 @@ class TestJulesContentReviewReader(unittest.TestCase):
 
             res = fetch_content_review_activities(adapter, "sessions/other-1", c, e, sr)
 
-            self.assertIsNone(res)
+            self.assertIsNotNone(res)
+            self.assertEqual(res.get("status"), "NEEDS_HUMAN_REVIEW")
+            self.assertIn("reason_code", res)
             self.assertEqual(transport.call_count, 0)
 
     def test_extracts_all_activity_types_correctly(self):
-        """정상 유형별 데이터 추출 테스트 (description 생략 허용 및 title 검증 등)"""
+        """정상 유형별 데이터 추출 테스트 (description 생략 허용 및 대응 관계 유지 등)"""
         c = default_contract()
         e = default_evidence()
         sr = default_session_resp()
@@ -165,37 +171,40 @@ class TestJulesContentReviewReader(unittest.TestCase):
         res = fetch_content_review_activities(adapter, "sessions/test-1", c, e, sr)
 
         self.assertIsNotNone(res)
-        self.assertEqual(len(res), 6)
+        self.assertEqual(res.get("status"), "SUCCESS")
+        activities = res.get("activities", [])
+        self.assertEqual(len(activities), 6)
 
-        # 1. planGenerated 검증
-        self.assertEqual(res[0].activity_type, "PLAN_GENERATED")
-        self.assertEqual(res[0].title, "Step 1\nStep 2")
-        self.assertEqual(res[0].description, "Desc 1")
+        # 1. planGenerated 검증 (대응 관계 유지)
+        self.assertEqual(activities[0].activity_type, "PLAN_GENERATED")
+        self.assertEqual(activities[0].title, "Step 1\nDesc 1\n\nStep 2")
+        self.assertIsNone(activities[0].description)
 
         # 2. progressUpdated 검증
-        self.assertEqual(res[1].activity_type, "PROGRESS_UPDATED")
-        self.assertEqual(res[1].title, "Progress 1")
-        self.assertEqual(res[1].description, "Desc 1")
+        self.assertEqual(activities[1].activity_type, "PROGRESS_UPDATED")
+        self.assertEqual(activities[1].title, "Progress 1")
+        self.assertEqual(activities[1].description, "Desc 1")
 
         # 3. progressUpdated (no desc) 검증
-        self.assertEqual(res[2].activity_type, "PROGRESS_UPDATED")
-        self.assertEqual(res[2].title, "Progress 2")
-        self.assertIsNone(res[2].description)
+        self.assertEqual(activities[2].activity_type, "PROGRESS_UPDATED")
+        self.assertEqual(activities[2].title, "Progress 2")
+        self.assertIsNone(activities[2].description)
 
-        # 4. planApproved 검증
-        self.assertEqual(res[3].activity_type, "PLAN_APPROVED")
-        self.assertIsNone(res[3].title)
+        # 4. planApproved 검증 (메타데이터 노출 안함)
+        self.assertEqual(activities[3].activity_type, "PLAN_APPROVED")
+        self.assertIsNone(activities[3].title)
+        self.assertIsNone(activities[3].description)
 
-        # 5. sessionCompleted 검증
-        self.assertEqual(res[4].activity_type, "SESSION_COMPLETED")
-        self.assertIsNone(res[4].title)
+        # 5. sessionCompleted 검증 (메타데이터 노출 안함)
+        self.assertEqual(activities[4].activity_type, "SESSION_COMPLETED")
+        self.assertIsNone(activities[4].title)
 
         # 6. agentMessaged 검증
-        self.assertEqual(res[5].activity_type, "AGENT_MESSAGED")
-        self.assertEqual(res[5].agent_message, "Hello from agent")
+        self.assertEqual(activities[5].activity_type, "AGENT_MESSAGED")
+        self.assertEqual(activities[5].agent_message, "Hello from agent")
 
     def test_aborts_on_user_message(self):
-        """사용자 메시지가 포함되어 있으면 대체 탐색 없이 즉시 None (NEEDS_HUMAN_REVIEW) 반환"""
+        """사용자 메시지가 포함되어 있으면 대체 탐색 없이 즉시 NEEDS_HUMAN_REVIEW 반환"""
         c = default_contract()
         e = default_evidence()
         sr = default_session_resp()
@@ -216,10 +225,12 @@ class TestJulesContentReviewReader(unittest.TestCase):
         adapter = RealJulesAdapter(api_key="fake-key", transport=transport)
 
         res = fetch_content_review_activities(adapter, "sessions/test-1", c, e, sr)
-        self.assertIsNone(res)
+        self.assertIsNotNone(res)
+        self.assertEqual(res.get("status"), "NEEDS_HUMAN_REVIEW")
+        self.assertIn("reason_code", res)
 
     def test_aborts_on_unverified_or_format_errors(self):
-        """형식 오류, 시간 순서 오류, 미확인 이벤트 시 원문 미반환 및 None 반환"""
+        """형식 오류, 시간 순서 오류, 미확인 이벤트 시 NEEDS_HUMAN_REVIEW 반환"""
         c = default_contract()
         e = default_evidence()
         sr = default_session_resp()
@@ -234,6 +245,9 @@ class TestJulesContentReviewReader(unittest.TestCase):
             ]),
             ("unknown event type", [
                 {"createTime": "2026-09-24T00:01:00Z", "unknownEvent": {}}
+            ]),
+            ("multiple union events", [
+                {"createTime": "2026-09-24T00:01:00Z", "planGenerated": {"plan": {"steps": [{"title": "1"}]}}, "progressUpdated": {"title": "2"}}
             ]),
             ("sessionFailed with unknown body", [
                 {"createTime": "2026-09-24T00:01:00Z", "sessionFailed": {"reason": "unknown"}}
@@ -251,7 +265,9 @@ class TestJulesContentReviewReader(unittest.TestCase):
                 transport = FakeHttpTransport(response_data={"activities": acts})
                 adapter = RealJulesAdapter(api_key="fake-key", transport=transport)
                 res = fetch_content_review_activities(adapter, "sessions/test-1", c, e, sr)
-                self.assertIsNone(res)
+                self.assertIsNotNone(res)
+                self.assertEqual(res.get("status"), "NEEDS_HUMAN_REVIEW")
+                self.assertIn("reason_code", res)
 
     @patch("logging.Logger.info")
     @patch("logging.Logger.error")
