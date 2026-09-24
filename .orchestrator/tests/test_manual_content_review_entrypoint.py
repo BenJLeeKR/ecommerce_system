@@ -181,6 +181,26 @@ class TestManualContentReviewEntrypoint(unittest.TestCase):
         self.assertEqual(result["reason_code"], "BINDING_CONTRACT_HASH_MISMATCH")
         self.assertEqual(self.mock_adapter.fetch_raw_activities_for_content_review.call_count, 0)
 
+    def test_request_masking(self):
+        req_repr = repr(self.request)
+        req_str = str(self.request)
+        req_dict = self.request.to_dict()
+
+        self.assertNotIn(self.session_id, req_repr)
+        self.assertNotIn(self.task_id, req_repr)
+        self.assertNotIn(self.approval_id, req_repr)
+        self.assertNotIn(self.contract_hash, req_repr)
+        self.assertNotIn(self.scope_hash, req_repr)
+
+        self.assertNotIn(self.session_id, req_str)
+        self.assertNotIn(self.task_id, req_str)
+
+        self.assertEqual(req_dict["session_id"], "<REDACTED>")
+        self.assertEqual(req_dict["task_id"], "<REDACTED>")
+        self.assertEqual(req_dict["approval_id"], "<REDACTED>")
+        self.assertEqual(req_dict["contract_hash"], "<REDACTED>")
+        self.assertEqual(req_dict["approved_scope_hash"], "<REDACTED>")
+
     def test_fail_plan_approval_not_required(self):
         self.contract.plan_approval_required = False
         _, new_contract_hash = canonicalize_contract(self.contract)
@@ -192,6 +212,28 @@ class TestManualContentReviewEntrypoint(unittest.TestCase):
         )
         self.assertEqual(result["status"], "NEEDS_HUMAN_REVIEW")
         self.assertEqual(result["reason_code"], "PLAN_APPROVAL_NOT_REQUIRED")
+        self.assertEqual(self.mock_adapter.fetch_raw_activities_for_content_review.call_count, 0)
+
+    def test_fail_evidence_not_active(self):
+        self.evidence.status = "REVOKED"
+        result = execute_manual_content_review_reader(
+            self.request, self.contract, self.evidence, self.session_response, self.binding, self.mock_adapter
+        )
+        self.assertEqual(result["status"], "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(result["reason_code"], "EVIDENCE_NOT_ACTIVE")
+        self.assertEqual(self.mock_adapter.fetch_raw_activities_for_content_review.call_count, 0)
+
+    def test_fail_auto_merge_true(self):
+        self.contract.auto_merge = True
+        _, new_contract_hash = canonicalize_contract(self.contract)
+        self.request.contract_hash = new_contract_hash
+        self.evidence.contract_hash = new_contract_hash
+        self.binding.contract_hash = new_contract_hash
+        result = execute_manual_content_review_reader(
+            self.request, self.contract, self.evidence, self.session_response, self.binding, self.mock_adapter
+        )
+        self.assertEqual(result["status"], "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(result["reason_code"], "AUTO_MERGE_ENABLED")
         self.assertEqual(self.mock_adapter.fetch_raw_activities_for_content_review.call_count, 0)
 
     def test_fail_reader_fetch_failed(self):
@@ -221,6 +263,7 @@ class TestManualContentReviewEntrypoint(unittest.TestCase):
         self.assertIn("<REDACTED>", str(activity))
         self.assertEqual(activity.to_dict()["agent_message"], "<REDACTED>")
 
+        mock_log.assert_not_called()
         mock_sqlite.assert_not_called()
         mock_open.assert_not_called()
 

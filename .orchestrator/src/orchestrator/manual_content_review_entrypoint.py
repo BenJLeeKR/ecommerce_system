@@ -19,6 +19,21 @@ class ManualContentReviewRequest:
     contract_hash: str
     approved_scope_hash: str
 
+    def to_dict(self) -> Dict[str, str]:
+        return {
+            "session_id": "<REDACTED>",
+            "task_id": "<REDACTED>",
+            "approval_id": "<REDACTED>",
+            "contract_hash": "<REDACTED>",
+            "approved_scope_hash": "<REDACTED>"
+        }
+
+    def __str__(self) -> str:
+        return "ManualContentReviewRequest(session_id=<REDACTED>, task_id=<REDACTED>, approval_id=<REDACTED>, contract_hash=<REDACTED>, approved_scope_hash=<REDACTED>)"
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
 def execute_manual_content_review_reader(
     request: ManualContentReviewRequest,
     contract: TaskContract,
