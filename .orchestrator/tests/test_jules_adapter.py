@@ -10,6 +10,7 @@ from orchestrator.jules_adapter import (
     JulesHttpTransport,
     UrllibJulesHttpTransport,
     TransportError,
+    ContentReviewFetchError,
     JulesSessionRequest,
     PreGateResult,
     ActivitySummary,
@@ -914,6 +915,80 @@ class TestRealJulesAdapter(unittest.TestCase):
         err_str = str(transport_err)
         self.assertNotIn("비밀 메시지", err_str)
         self.assertIn("AUTHENTICATION_FAILED", err_str)
+
+
+    def test_content_review_transport_errors_preserve_safe_reason_code(self) -> None:
+        for reason_code in (
+            "AUTHENTICATION_FAILED",
+            "HTTP_CONNECTION_FAILED",
+            "TIMEOUT_EXCEEDED",
+            "INVALID_RESPONSE_FORMAT",
+        ):
+            with self.subTest(reason_code=reason_code):
+                self.mock_transport.requests.clear()
+                self.mock_transport.error_to_raise = TransportError(reason_code)
+                with self.assertRaises(TransportError) as context:
+                    self.adapter.fetch_raw_activities_for_content_review("sessions/ses-real-001")
+                self.assertEqual(context.exception.reason_code, reason_code)
+                self.assertEqual(len(self.mock_transport.requests), 1)
+        self.mock_transport.error_to_raise = None
+
+    def test_content_review_non_dict_response_raises_safe_transport_error(self) -> None:
+        self.mock_transport.response_to_return = []
+
+        with self.assertRaises(TransportError) as context:
+            self.adapter.fetch_raw_activities_for_content_review("sessions/ses-real-001")
+
+        self.assertEqual(context.exception.reason_code, "INVALID_RESPONSE_FORMAT")
+        self.assertEqual(len(self.mock_transport.requests), 1)
+
+    def test_content_review_unexpected_transport_error_is_safely_converted(self) -> None:
+        self.mock_transport.error_to_raise = RuntimeError("sensitive unexpected transport text")
+
+        with self.assertRaises(ContentReviewFetchError) as context:
+            self.adapter.fetch_raw_activities_for_content_review("sessions/ses-real-001")
+
+        self.assertEqual(context.exception.reason_code, "INTERNAL_CONTENT_REVIEW_FAILURE")
+        self.assertNotIn("sensitive unexpected transport text", str(context.exception))
+        self.assertEqual(len(self.mock_transport.requests), 1)
+        self.mock_transport.error_to_raise = None
+
+    def test_content_review_invalid_activities_list_raises_safe_error(self) -> None:
+        self.mock_transport.response_to_return = {}
+
+        with self.assertRaises(ContentReviewFetchError) as context:
+            self.adapter.fetch_raw_activities_for_content_review("sessions/ses-real-001")
+
+        self.assertEqual(context.exception.reason_code, "INVALID_ACTIVITIES_LIST_FORMAT")
+        self.assertEqual(len(self.mock_transport.requests), 1)
+
+    def test_content_review_invalid_event_structure_raises_safe_error(self) -> None:
+        self.mock_transport.response_to_return = {
+            "activities": [{"createTime": "not-a-time", "planApproved": {}}]
+        }
+
+        with self.assertRaises(ContentReviewFetchError) as context:
+            self.adapter.fetch_raw_activities_for_content_review("sessions/ses-real-001")
+
+        self.assertEqual(context.exception.reason_code, "INVALID_EVENT_STRUCTURE")
+        self.assertEqual(len(self.mock_transport.requests), 1)
+
+    def test_content_review_success_makes_one_request(self) -> None:
+        self.mock_transport.response_to_return = {
+            "activities": [{"createTime": "2026-09-24T00:00:00Z", "planApproved": {}}]
+        }
+
+        result = self.adapter.fetch_raw_activities_for_content_review("sessions/ses-real-001")
+
+        self.assertEqual(len(self.mock_transport.requests), 1)
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)
+
+    def test_content_review_fetch_error_masks_invalid_reason_code(self) -> None:
+        error = ContentReviewFetchError("invalid reason with text")
+
+        self.assertEqual(error.reason_code, "INTERNAL_CONTENT_REVIEW_FAILURE")
+        self.assertNotIn("invalid reason with text", str(error))
 
 
 if __name__ == "__main__":

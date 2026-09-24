@@ -28,3 +28,17 @@
 4. **비영속 및 메모리 한정 사용**:
    - 추출된 원문 데이터를 담는 객체(`ReviewActivity`)는 `to_dict()`, `__str__()`, `__repr__()` 호출 시 원문 내용을 `<REDACTED>`로 치환합니다.
    - Git, SQLite, 문서, PR 본문, 콘솔 로그 등에 원시 텍스트가 유출되지 않도록 강력한 보호 조치를 취합니다.
+
+
+## 5. 안전 진단 코드
+
+수동 콘텐츠 조회 경계는 원문을 보존하거나 출력하지 않고, 다음의 고정된 비민감 사유 코드만 Reader로 전달합니다.
+
+- 전송 계층: AUTHENTICATION_FAILED, HTTP_CONNECTION_FAILED, TIMEOUT_EXCEEDED, INVALID_RESPONSE_FORMAT
+- activities 목록 형식: INVALID_ACTIVITIES_LIST_FORMAT
+- 시간·union 이벤트 등 활동 구조: INVALID_EVENT_STRUCTURE
+- 예상하지 못한 내부 실패: INTERNAL_CONTENT_REVIEW_FAILURE
+
+ContentReviewFetchError는 사유 코드 외 자유 문자열이나 원시 데이터를 보유하지 않습니다. Reader는 허용된 안전 예외만 처리하며, 허용되지 않은 예외나 사유 코드는 고정 내부 실패 코드로 전환합니다. 기존 Fake Adapter가 None을 반환하는 경우에는 기존 RAW_ACTIVITIES_FETCH_FAILED fallback을 유지합니다.
+
+이 분류는 수동 검토의 실패 원인을 비민감하게 구분하기 위한 것이며, 자동 승인·자동 검토·자동 병합·자동 배포·자동 재시도 기능을 추가하지 않습니다.

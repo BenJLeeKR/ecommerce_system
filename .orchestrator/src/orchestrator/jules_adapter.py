@@ -493,6 +493,22 @@ class TransportError(Exception):
         return f"TransportError(reason_code={self.reason_code})"
 
 
+class ContentReviewFetchError(Exception):
+    """수동 콘텐츠 검토 조회의 비민감 실패만 전달하는 예외."""
+
+    def __init__(self, reason_code: object) -> None:
+        safe_reason_code = (
+            reason_code
+            if isinstance(reason_code, str) and validate_reason_code(reason_code)
+            else "INTERNAL_CONTENT_REVIEW_FAILURE"
+        )
+        super().__init__(safe_reason_code)
+        self.reason_code = safe_reason_code
+
+    def __str__(self) -> str:
+        return f"ContentReviewFetchError(reason_code={self.reason_code})"
+
+
 class UrllibJulesHttpTransport(JulesHttpTransport):
     """urllib.request 기반의 주입 가능한 HTTP 전송 계층.
 
@@ -925,49 +941,59 @@ class RealJulesAdapter(JulesAdapter):
                 headers=self._get_headers(),
             )
             if not isinstance(res, dict):
-                return None
+                raise TransportError("INVALID_RESPONSE_FORMAT")
 
-            raw_activities = res.get("activities", [])
-            if not isinstance(raw_activities, list):
-                return None
+            if "activities" not in res or not isinstance(res["activities"], list):
+                raise ContentReviewFetchError("INVALID_ACTIVITIES_LIST_FORMAT")
+            raw_activities = res["activities"]
 
             parsed_activities = []
-            allowed_events = {"agentMessaged", "planGenerated", "progressUpdated", "planApproved", "sessionCompleted"}
+            allowed_events = {
+                "agentMessaged",
+                "planGenerated",
+                "progressUpdated",
+                "planApproved",
+                "sessionCompleted",
+            }
             for act in raw_activities:
                 if not isinstance(act, dict):
-                    return None
+                    raise ContentReviewFetchError("INVALID_EVENT_STRUCTURE")
 
-                # 복수 union 이벤트 및 금지 이벤트 필터링
-                union_keys = [k for k in act.keys() if k not in ("createTime", "name", "id", "metadata")]
+                union_keys = [
+                    key for key in act.keys()
+                    if key not in ("createTime", "name", "id", "metadata")
+                ]
                 if len(union_keys) != 1:
-                    return None
+                    raise ContentReviewFetchError("INVALID_EVENT_STRUCTURE")
 
                 event_type = union_keys[0]
                 if event_type == "userMessaged":
-                    # 단일 union이 userMessaged인 경우에만 안전하게 건너뜀
                     continue
 
                 create_time_str = act.get("createTime")
-                if not create_time_str or not isinstance(create_time_str, str):
-                    return None
+                if not isinstance(create_time_str, str) or not create_time_str:
+                    raise ContentReviewFetchError("INVALID_EVENT_STRUCTURE")
                 try:
-                    dt = datetime.fromisoformat(create_time_str.replace('Z', '+00:00'))
+                    dt = datetime.fromisoformat(create_time_str.replace("Z", "+00:00"))
                 except (ValueError, TypeError):
-                    return None
+                    raise ContentReviewFetchError("INVALID_EVENT_STRUCTURE") from None
 
                 if event_type not in allowed_events:
-                    return None
+                    raise ContentReviewFetchError("INVALID_EVENT_STRUCTURE")
 
                 event_data = act[event_type]
                 if not isinstance(event_data, dict):
-                    return None
+                    raise ContentReviewFetchError("INVALID_EVENT_STRUCTURE")
 
-                # 허용된 필드만 추출하여 최소 typed 형태(dict)로 재구성
                 safe_act = {"createTime": create_time_str}
                 if event_type == "agentMessaged":
                     safe_act["agentMessaged"] = {"agentMessage": event_data.get("agentMessage")}
                 elif event_type == "planGenerated":
-                    if "plan" in event_data and isinstance(event_data["plan"], dict) and "steps" in event_data["plan"]:
+                    if (
+                        "plan" in event_data
+                        and isinstance(event_data["plan"], dict)
+                        and "steps" in event_data["plan"]
+                    ):
                         safe_steps = []
                         for step in event_data["plan"]["steps"]:
                             if isinstance(step, dict):
@@ -991,12 +1017,14 @@ class RealJulesAdapter(JulesAdapter):
 
             times = [dt for dt, _ in parsed_activities]
             if len(times) != len(set(times)):
-                return None
+                raise ContentReviewFetchError("INVALID_EVENT_STRUCTURE")
 
-            parsed_activities.sort(key=lambda x: x[0])
+            parsed_activities.sort(key=lambda item: item[0])
             return parsed_activities
+        except (TransportError, ContentReviewFetchError):
+            raise
         except Exception:
-            return None
+            raise ContentReviewFetchError("INTERNAL_CONTENT_REVIEW_FAILURE") from None
 
     def get_activities(self, session_resource_name: str) -> ActivitySummary:
         """GET /sessions/{session_resource_name}/activities 연동.

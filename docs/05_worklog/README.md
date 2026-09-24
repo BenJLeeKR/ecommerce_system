@@ -44,3 +44,4 @@
 
 - [WL-0042: Orchestrator 수동 리뷰(Content Handoff) 리더 구현](WL-0042-2026-09-24-orchestrator-manual-jules-content-handoff.md) - 상태: 완료
 - [WL-0043: Orchestrator 수동 콘텐츠 검토 진입점 구현](WL-0043-2026-09-24-orchestrator-manual-content-review-entrypoint.md) - 상태: 완료
+- [WL-0044](WL-0044-2026-09-24-orchestrator-content-review-safe-diagnostics.md) — 수동 콘텐츠 조회 실패를 원문 없이 안전 사유 코드로 분리하고 회귀 검증을 보강했다.
