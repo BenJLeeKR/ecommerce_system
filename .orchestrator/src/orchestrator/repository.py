@@ -14,6 +14,7 @@ from .models import (
     StateTransition,
     ScopeValidationRecord,
     PersistentSessionBinding,
+    PlanSessionRegistration,
 )
 from .validator import validate_utc_iso8601
 
@@ -156,6 +157,15 @@ class StateRepository:
             UNIQUE (session_id),
             UNIQUE (branch_name),
             UNIQUE (pr_number)
+        );
+
+        CREATE TABLE IF NOT EXISTS plan_session_registrations (
+            task_id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL UNIQUE,
+            approval_id TEXT NOT NULL,
+            contract_hash TEXT NOT NULL,
+            approved_scope_hash TEXT NOT NULL,
+            created_at_utc TEXT NOT NULL
         );
         """
         with self._get_connection() as conn:
@@ -460,6 +470,79 @@ class StateRepository:
                     recorded_at_utc=row["recorded_at_utc"],
                 )
             return None
+
+
+    # 7. PlanSessionRegistration 관리 (최종 1:1:1 영구 결속과 별도)
+    def save_plan_session_registration(self, registration: PlanSessionRegistration) -> None:
+        """브랜치·PR 생성 전 Plan 세션 등록을 불변·멱등 방식으로 저장합니다."""
+        is_valid, msg = validate_utc_iso8601(registration.created_at_utc)
+        if not is_valid:
+            raise RepositoryError(f"created_at_utc 유효성 오류: {msg}")
+
+        query = """
+        SELECT task_id, session_id, approval_id, contract_hash, approved_scope_hash, created_at_utc
+        FROM plan_session_registrations
+        WHERE task_id = ? OR session_id = ?
+        """
+        with self._get_connection() as conn:
+            final_binding = conn.execute(
+                "SELECT 1 FROM persistent_session_bindings WHERE session_id = ?",
+                (registration.session_id,),
+            ).fetchone()
+            if final_binding:
+                raise RepositoryBindingConflictError(
+                    "최종 1:1:1 결속이 존재하는 세션은 Plan 단계에 등록할 수 없습니다."
+                )
+            rows = conn.execute(query, (registration.task_id, registration.session_id)).fetchall()
+            for row in rows:
+                if (
+                    row["task_id"] == registration.task_id
+                    and row["session_id"] == registration.session_id
+                    and row["approval_id"] == registration.approval_id
+                    and row["contract_hash"] == registration.contract_hash
+                    and row["approved_scope_hash"] == registration.approved_scope_hash
+                    and row["created_at_utc"] == registration.created_at_utc
+                ):
+                    return
+                raise RepositoryBindingConflictError(
+                    "Plan 단계 task_id 또는 session_id에 상충되는 등록 정보가 존재합니다."
+                )
+
+            conn.execute(
+                """
+                INSERT INTO plan_session_registrations (
+                    task_id, session_id, approval_id, contract_hash, approved_scope_hash, created_at_utc
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    registration.task_id,
+                    registration.session_id,
+                    registration.approval_id,
+                    registration.contract_hash,
+                    registration.approved_scope_hash,
+                    registration.created_at_utc,
+                ),
+            )
+            conn.commit()
+
+    def get_plan_session_registration(self, task_id: str) -> Optional[PlanSessionRegistration]:
+        """Task ID로 Plan 단계의 비민감 세션 등록을 조회합니다."""
+        query = """
+        SELECT task_id, session_id, approval_id, contract_hash, approved_scope_hash, created_at_utc
+        FROM plan_session_registrations WHERE task_id = ?
+        """
+        with self._get_connection() as conn:
+            row = conn.execute(query, (task_id,)).fetchone()
+            if not row:
+                return None
+            return PlanSessionRegistration(
+                task_id=row["task_id"],
+                session_id=row["session_id"],
+                approval_id=row["approval_id"],
+                contract_hash=row["contract_hash"],
+                approved_scope_hash=row["approved_scope_hash"],
+                created_at_utc=row["created_at_utc"],
+            )
 
     # 3. ExecutionRecord 관리
     def save_execution(self, execution: ExecutionRecord) -> None:
