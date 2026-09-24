@@ -59,13 +59,13 @@ class TestManualPlanReviewEntrypoint(unittest.TestCase):
             approval_id="approval-456",
             contract_hash=self.contract_hash,
             approved_scope_hash=self.scope_hash,
-            session_id="session-789"
+            session_id="sessions/session-789"
         )
 
         # Valid Registration
         self.registration = PlanSessionRegistration(
             task_id="task-123",
-            session_id="session-789",
+            session_id="sessions/session-789",
             approval_id="approval-456",
             contract_hash=self.contract_hash,
             approved_scope_hash=self.scope_hash,
@@ -246,11 +246,11 @@ class TestManualPlanReviewEntrypoint(unittest.TestCase):
             approval_id="approval-456",
             contract_hash=self.contract_hash,
             approved_scope_hash=self.scope_hash,
-            session_id="session-789"
+            session_id="sessions/session-789"
         )
         expected_session_response = JulesSessionResponse(
             status="CREATED",
-            session_id="session-789",
+            session_id="sessions/session-789",
             task_id="task-123",
             branch_name=None,
             pr_number=None,
@@ -268,6 +268,43 @@ class TestManualPlanReviewEntrypoint(unittest.TestCase):
         )
 
         # Verify file/logging not called
+        mock_open.assert_not_called()
+        mock_log_info.assert_not_called()
+
+
+
+    @patch("orchestrator.manual_plan_review_entrypoint.get_plan_session_registration")
+    @patch("builtins.open")
+    @patch("logging.Logger.info")
+    def test_happy_path_real_reader(self, mock_log_info, mock_open, mock_get_reg):
+        """정상 경로 - 실제 Reader를 통한 통합 테스트 검증"""
+        mock_get_reg.return_value = self.valid_registration_result
+
+        # Create a fake memory adapter
+        class FakeAdapter:
+            def fetch_plan_text_only(self, session_id):
+                self.called = True
+                self.called_with_session = session_id
+                return "Fake Plan Content"
+
+        fake_adapter = FakeAdapter()
+        fake_adapter.called = False
+
+        result = execute_manual_registered_plan_review(
+            repository=self.repository,
+            jules_adapter=fake_adapter,
+            contract=self.contract,
+            approval_evidence=self.approval_evidence,
+            review_request=self.review_request,
+        )
+
+        self.assertEqual(result.status, "PLAN_READY")
+        self.assertEqual(result.plan_text, "Fake Plan Content")
+
+        self.assertTrue(fake_adapter.called)
+        self.assertEqual(fake_adapter.called_with_session, "sessions/session-789")
+        mock_get_reg.assert_called_once_with(repository=self.repository, task_id="task-123")
+
         mock_open.assert_not_called()
         mock_log_info.assert_not_called()
 
