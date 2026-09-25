@@ -84,7 +84,6 @@ class TestManualRegisteredContentReviewEntrypoint(unittest.TestCase):
 
         # Setup repository mocks
         self.repository.get_task.return_value = self.task_record
-        # Copy the original evidence to the repository mock so changing the outer one doesn't affect the repository directly unless we explicitly change the repository's returned value.
         import copy
         self.repository.get_approval_evidence.return_value = copy.deepcopy(self.approval_evidence)
 
@@ -139,7 +138,7 @@ class TestManualRegisteredContentReviewEntrypoint(unittest.TestCase):
     @patch("orchestrator.manual_registered_content_review_entrypoint.get_plan_session_registration")
     @patch("orchestrator.jules_content_review_reader.fetch_content_review_activities")
     def test_hash_mismatch(self, mock_reader, mock_get_reg):
-        """Contract/Scope 해시 불일치 시 0회 호출 검증"""
+        """Contract 해시 불일치 시 0회 호출 검증"""
         self.approval_evidence.contract_hash = "wrong_hash"
         result = execute_manual_registered_content_review(
             repository=self.repository,
@@ -155,8 +154,25 @@ class TestManualRegisteredContentReviewEntrypoint(unittest.TestCase):
 
     @patch("orchestrator.manual_registered_content_review_entrypoint.get_plan_session_registration")
     @patch("orchestrator.jules_content_review_reader.fetch_content_review_activities")
+    def test_scope_hash_mismatch(self, mock_reader, mock_get_reg):
+        """Scope 해시 불일치 시 0회 호출 검증"""
+        self.approval_evidence.approved_scope_hash = "wrong_scope_hash"
+        result = execute_manual_registered_content_review(
+            repository=self.repository,
+            jules_adapter=self.jules_adapter,
+            contract=self.contract,
+            approval_evidence=self.approval_evidence,
+            review_request=self.review_request,
+        )
+        self.assertEqual(result["status"], "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(result["reason_code"], "SCOPE_HASH_MISMATCH")
+        mock_get_reg.assert_not_called()
+        mock_reader.assert_not_called()
+
+    @patch("orchestrator.manual_registered_content_review_entrypoint.get_plan_session_registration")
+    @patch("orchestrator.jules_content_review_reader.fetch_content_review_activities")
     def test_repository_task_mismatch(self, mock_reader, mock_get_reg):
-        """저장소 TaskRecord 불일치 시 0회 호출 검증"""
+        """저장소 TaskRecord 속성 불일치 시 0회 호출 검증"""
         self.task_record.base_commit_sha = "wrong_sha"
         result = execute_manual_registered_content_review(
             repository=self.repository,
@@ -172,19 +188,69 @@ class TestManualRegisteredContentReviewEntrypoint(unittest.TestCase):
 
     @patch("orchestrator.manual_registered_content_review_entrypoint.get_plan_session_registration")
     @patch("orchestrator.jules_content_review_reader.fetch_content_review_activities")
+    def test_repository_task_id_mismatch(self, mock_reader, mock_get_reg):
+        """저장소 TaskRecord task_id 불일치 시 0회 호출 검증"""
+        self.task_record.task_id = "wrong_task_id"
+        result = execute_manual_registered_content_review(
+            repository=self.repository,
+            jules_adapter=self.jules_adapter,
+            contract=self.contract,
+            approval_evidence=self.approval_evidence,
+            review_request=self.review_request,
+        )
+        self.assertEqual(result["status"], "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(result["reason_code"], "TASK_RECORD_MISMATCH")
+        mock_get_reg.assert_not_called()
+        mock_reader.assert_not_called()
+
+    @patch("orchestrator.manual_registered_content_review_entrypoint.get_plan_session_registration")
+    @patch("orchestrator.jules_content_review_reader.fetch_content_review_activities")
     def test_repository_evidence_mismatch(self, mock_reader, mock_get_reg):
-        """저장소 ApprovalEvidence 불일치 시 0회 호출 검증"""
-        # modify only the repository mock's returned evidence
+        """저장소 ApprovalEvidence 상태 불일치 시 0회 호출 검증"""
         self.repository.get_approval_evidence.return_value.status = "REVOKED"
         result = execute_manual_registered_content_review(
             repository=self.repository,
             jules_adapter=self.jules_adapter,
             contract=self.contract,
-            approval_evidence=self.approval_evidence,  # This one is still "ACTIVE"
+            approval_evidence=self.approval_evidence,
             review_request=self.review_request,
         )
         self.assertEqual(result["status"], "NEEDS_HUMAN_REVIEW")
         self.assertEqual(result["reason_code"], "APPROVAL_EVIDENCE_MISMATCH")
+        mock_get_reg.assert_not_called()
+        mock_reader.assert_not_called()
+
+    @patch("orchestrator.manual_registered_content_review_entrypoint.get_plan_session_registration")
+    @patch("orchestrator.jules_content_review_reader.fetch_content_review_activities")
+    def test_repository_evidence_id_mismatch(self, mock_reader, mock_get_reg):
+        """저장소 ApprovalEvidence approval_id 불일치 시 0회 호출 검증"""
+        self.repository.get_approval_evidence.return_value.approval_id = "wrong_approval_id"
+        result = execute_manual_registered_content_review(
+            repository=self.repository,
+            jules_adapter=self.jules_adapter,
+            contract=self.contract,
+            approval_evidence=self.approval_evidence,
+            review_request=self.review_request,
+        )
+        self.assertEqual(result["status"], "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(result["reason_code"], "APPROVAL_EVIDENCE_MISMATCH")
+        mock_get_reg.assert_not_called()
+        mock_reader.assert_not_called()
+
+    @patch("orchestrator.manual_registered_content_review_entrypoint.get_plan_session_registration")
+    @patch("orchestrator.jules_content_review_reader.fetch_content_review_activities")
+    def test_repository_fetch_error(self, mock_reader, mock_get_reg):
+        """저장소 예외 발생 시 전파하지 않고 0회 호출 및 NEEDS_HUMAN_REVIEW 검증"""
+        self.repository.get_task.side_effect = Exception("DB error")
+        result = execute_manual_registered_content_review(
+            repository=self.repository,
+            jules_adapter=self.jules_adapter,
+            contract=self.contract,
+            approval_evidence=self.approval_evidence,
+            review_request=self.review_request,
+        )
+        self.assertEqual(result["status"], "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(result["reason_code"], "REPOSITORY_FETCH_FAILED")
         mock_get_reg.assert_not_called()
         mock_reader.assert_not_called()
 

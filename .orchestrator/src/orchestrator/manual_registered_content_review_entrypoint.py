@@ -81,11 +81,16 @@ def execute_manual_registered_content_review(
          return _failure("EVIDENCE_CONTRACT_VERSION_MISMATCH")
 
     # StateRepository의 TaskRecord 대조 검증
-    stored_task = repository.get_task(contract.task_id)
+    try:
+        stored_task = repository.get_task(contract.task_id)
+    except Exception:
+        return _failure("REPOSITORY_FETCH_FAILED")
+
     if stored_task is None:
         return _failure("TASK_NOT_REGISTERED")
     if (
-        stored_task.base_commit_sha != contract.base_commit_sha
+        stored_task.task_id != contract.task_id
+        or stored_task.base_commit_sha != contract.base_commit_sha
         or stored_task.contract_hash != contract_hash
         or stored_task.approved_scope_hash != scope_hash
         or stored_task.idempotency_key != contract.idempotency_key
@@ -93,11 +98,16 @@ def execute_manual_registered_content_review(
         return _failure("TASK_RECORD_MISMATCH")
 
     # StateRepository의 ApprovalEvidence 대조 검증
-    stored_evidence = repository.get_approval_evidence(approval_evidence.approval_id)
+    try:
+        stored_evidence = repository.get_approval_evidence(approval_evidence.approval_id)
+    except Exception:
+        return _failure("REPOSITORY_FETCH_FAILED")
+
     if stored_evidence is None:
         return _failure("APPROVAL_EVIDENCE_NOT_REGISTERED")
     if (
-        stored_evidence.task_id != contract.task_id
+        stored_evidence.approval_id != approval_evidence.approval_id
+        or stored_evidence.task_id != contract.task_id
         or stored_evidence.status != "ACTIVE"
         or stored_evidence.contract_version != contract.contract_version
         or stored_evidence.contract_hash != contract_hash
@@ -105,7 +115,11 @@ def execute_manual_registered_content_review(
     ):
          return _failure("APPROVAL_EVIDENCE_MISMATCH")
 
-    registration_result = get_plan_session_registration(repository=repository, task_id=contract.task_id)
+    try:
+        registration_result = get_plan_session_registration(repository=repository, task_id=contract.task_id)
+    except Exception:
+        return _failure("REPOSITORY_FETCH_FAILED")
+
     if registration_result.status != "REGISTERED" or registration_result.registration is None:
         return _failure(registration_result.reason_code or "PLAN_SESSION_NOT_REGISTERED")
 
