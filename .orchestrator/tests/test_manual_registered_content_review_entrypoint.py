@@ -239,8 +239,25 @@ class TestManualRegisteredContentReviewEntrypoint(unittest.TestCase):
 
     @patch("orchestrator.manual_registered_content_review_entrypoint.get_plan_session_registration")
     @patch("orchestrator.jules_content_review_reader.fetch_content_review_activities")
-    def test_repository_fetch_error(self, mock_reader, mock_get_reg):
-        """저장소 예외 발생 시 전파하지 않고 0회 호출 및 NEEDS_HUMAN_REVIEW 검증"""
+    def test_repository_evidence_binding_field_mismatch(self, mock_reader, mock_get_reg):
+        """저장소 ApprovalEvidence 대표 결속 필드(task_id, contract_version 등) 불일치 시 0회 호출 검증"""
+        self.repository.get_approval_evidence.return_value.contract_version = "wrong_version"
+        result = execute_manual_registered_content_review(
+            repository=self.repository,
+            jules_adapter=self.jules_adapter,
+            contract=self.contract,
+            approval_evidence=self.approval_evidence,
+            review_request=self.review_request,
+        )
+        self.assertEqual(result["status"], "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(result["reason_code"], "APPROVAL_EVIDENCE_MISMATCH")
+        mock_get_reg.assert_not_called()
+        mock_reader.assert_not_called()
+
+    @patch("orchestrator.manual_registered_content_review_entrypoint.get_plan_session_registration")
+    @patch("orchestrator.jules_content_review_reader.fetch_content_review_activities")
+    def test_repository_fetch_error_task(self, mock_reader, mock_get_reg):
+        """저장소 get_task 예외 발생 시 전파하지 않고 0회 호출 및 NEEDS_HUMAN_REVIEW 검증"""
         self.repository.get_task.side_effect = Exception("DB error")
         result = execute_manual_registered_content_review(
             repository=self.repository,
@@ -252,6 +269,40 @@ class TestManualRegisteredContentReviewEntrypoint(unittest.TestCase):
         self.assertEqual(result["status"], "NEEDS_HUMAN_REVIEW")
         self.assertEqual(result["reason_code"], "REPOSITORY_FETCH_FAILED")
         mock_get_reg.assert_not_called()
+        mock_reader.assert_not_called()
+
+    @patch("orchestrator.manual_registered_content_review_entrypoint.get_plan_session_registration")
+    @patch("orchestrator.jules_content_review_reader.fetch_content_review_activities")
+    def test_repository_fetch_error_evidence(self, mock_reader, mock_get_reg):
+        """저장소 get_approval_evidence 예외 발생 시 전파하지 않고 0회 호출 및 NEEDS_HUMAN_REVIEW 검증"""
+        self.repository.get_approval_evidence.side_effect = Exception("DB error evidence")
+        result = execute_manual_registered_content_review(
+            repository=self.repository,
+            jules_adapter=self.jules_adapter,
+            contract=self.contract,
+            approval_evidence=self.approval_evidence,
+            review_request=self.review_request,
+        )
+        self.assertEqual(result["status"], "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(result["reason_code"], "REPOSITORY_FETCH_FAILED")
+        mock_get_reg.assert_not_called()
+        mock_reader.assert_not_called()
+
+    @patch("orchestrator.manual_registered_content_review_entrypoint.get_plan_session_registration")
+    @patch("orchestrator.jules_content_review_reader.fetch_content_review_activities")
+    def test_repository_fetch_error_registration(self, mock_reader, mock_get_reg):
+        """저장소 get_plan_session_registration 예외 발생 시 전파하지 않고 0회 호출 및 NEEDS_HUMAN_REVIEW 검증"""
+        mock_get_reg.side_effect = Exception("DB error registration")
+        result = execute_manual_registered_content_review(
+            repository=self.repository,
+            jules_adapter=self.jules_adapter,
+            contract=self.contract,
+            approval_evidence=self.approval_evidence,
+            review_request=self.review_request,
+        )
+        self.assertEqual(result["status"], "NEEDS_HUMAN_REVIEW")
+        self.assertEqual(result["reason_code"], "REPOSITORY_FETCH_FAILED")
+        mock_get_reg.assert_called_once_with(repository=self.repository, task_id="task-123")
         mock_reader.assert_not_called()
 
     @patch("orchestrator.manual_registered_content_review_entrypoint.get_plan_session_registration")
