@@ -41,7 +41,6 @@
 - [WL-0038](WL-0038-2026-09-24-orchestrator-manual-plan-review-reader.md) — 수동 Plan 검토 조회 인터페이스를 구현하고 비영속 원칙 및 1:1:1 결속 유예 기준을 정립했다.
 - [WL-0039](WL-0039-2026-09-24-orchestrator-manual-plan-reader-live-poc.md) — 수동 Plan 조회 Live POC의 비민감 성공 절차, 검증 경계, 제한 사항을 문서화했다.
 - [WL-0040](WL-0040-2026-09-24-orchestrator-manual-plan-payload-alignment.md) — 수동 Plan 조회 페이로드를 실제 planGenerated.plan.steps 객체 구조에 맞게 정합화하고 엄격한 예외 검증을 추가했다.
-
 - [WL-0042: Orchestrator 수동 리뷰(Content Handoff) 리더 구현](WL-0042-2026-09-24-orchestrator-manual-jules-content-handoff.md) - 상태: 완료
 - [WL-0043: Orchestrator 수동 콘텐츠 검토 진입점 구현](WL-0043-2026-09-24-orchestrator-manual-content-review-entrypoint.md) - 상태: 완료
 - [WL-0044](WL-0044-2026-09-24-orchestrator-content-review-safe-diagnostics.md) — 수동 콘텐츠 조회 실패를 원문 없이 안전 사유 코드로 분리하고 회귀 검증을 보강했다.
@@ -50,3 +49,4 @@
 - [WL-0047](WL-0047-2026-09-25-orchestrator-registered-plan-review-entrypoint.md) — 외부 저장소 기반 수동 Plan 검토 단일 진입점을 추가하고 1:1:1 결속 유예 기준을 문서화했다.
 - [WL-0048](WL-0048-2026-09-25-orchestrator-jules-api-execution-protocol.md) — Codex-Jules 안전 API 실행 절차 및 결속 기준(비영속 경계 포함)을 정합화했다.
 - [WL-0049](WL-0049-2026-09-25-orchestrator-actual-activity-schema-alignment.md) — Orchestrator 실제 Activity Schema 및 userMessaged 처리 정책 정합화했다.
+- [WL-0050](WL-0050-2026-09-25-orchestrator-manual-content-review-live-poc.md) — 등록된 외부 세션을 기반으로 수동 콘텐츠 검토 진입점을 분리하고 Pre-PR 단계의 위임 검증을 문서화했다.
