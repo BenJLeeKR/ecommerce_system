@@ -50,7 +50,8 @@ def execute_manual_registered_content_review(
 ) -> Dict[str, Any]:
     """등록된 세션을 검증한 후, 수동 콘텐츠 검토 Reader로 위임합니다.
 
-    이 진입점은 Pre-PR 단계이므로 최종 Session-Branch-PR 1:1:1 결속 검사를 유예합니다.
+    이 진입점은 Pre-PR 단계이므로 최종 Session-Branch-PR 1:1:1 결속 검사를 유예하지만,
+    StateRepository에 저장된 TaskRecord 및 ApprovalEvidence와의 일치 여부를 엄격히 대조합니다.
     """
     if approval_evidence.status != "ACTIVE":
         return _failure("APPROVAL_NOT_ACTIVE")
@@ -78,6 +79,31 @@ def execute_manual_registered_content_review(
     contract_version = getattr(contract, "contract_version", None)
     if contract_version is not None and approval_evidence.contract_version != contract_version:
          return _failure("EVIDENCE_CONTRACT_VERSION_MISMATCH")
+
+    # StateRepository의 TaskRecord 대조 검증
+    stored_task = repository.get_task(contract.task_id)
+    if stored_task is None:
+        return _failure("TASK_NOT_REGISTERED")
+    if (
+        stored_task.base_commit_sha != contract.base_commit_sha
+        or stored_task.contract_hash != contract_hash
+        or stored_task.approved_scope_hash != scope_hash
+        or stored_task.idempotency_key != contract.idempotency_key
+    ):
+        return _failure("TASK_RECORD_MISMATCH")
+
+    # StateRepository의 ApprovalEvidence 대조 검증
+    stored_evidence = repository.get_approval_evidence(approval_evidence.approval_id)
+    if stored_evidence is None:
+        return _failure("APPROVAL_EVIDENCE_NOT_REGISTERED")
+    if (
+        stored_evidence.task_id != contract.task_id
+        or stored_evidence.status != "ACTIVE"
+        or stored_evidence.contract_version != contract.contract_version
+        or stored_evidence.contract_hash != contract_hash
+        or stored_evidence.approved_scope_hash != scope_hash
+    ):
+         return _failure("APPROVAL_EVIDENCE_MISMATCH")
 
     registration_result = get_plan_session_registration(repository=repository, task_id=contract.task_id)
     if registration_result.status != "REGISTERED" or registration_result.registration is None:
