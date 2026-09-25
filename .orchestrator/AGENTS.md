@@ -61,6 +61,10 @@
   - 코드 로직 및 비즈니스 규칙과 관련된 다른 유형의 오류 발생
   - 1:1:1 세션/브랜치/PR 바인딩 원칙 위반
 
-## Orchestrator 동작 원칙
+## Orchestrator 동작 원칙 (안전 API 실행 절차)
 
-- **Canonical Scope Hash 사전 검증**: Jules 세션을 생성하기 전, Task Contract의 `allowed_paths` 및 `forbidden_paths`에 대한 정규화 해시를 선제적으로 산출 및 검증하여, 불일치/실패 시 즉각 `NEEDS_HUMAN_REVIEW` 상태로 세션 생성을 거부합니다.
+- **사전 검증 및 진입 통제**: Jules 세션을 생성하는 API 호출 전, 반드시 Contract, ACTIVE 상태의 승인 증적(ApprovalEvidence), 기준 SHA, 그리고 Task Contract의 `allowed_paths` 및 `forbidden_paths`에 대한 정규화 해시(Contract/Scope 해시)를 선제적으로 산출하고 검증합니다. 검증 실패나 불일치 발생 시 즉각 `NEEDS_HUMAN_REVIEW` 상태로 API 호출을 거부합니다.
+- **Plan 승인 강제**: 세션 생성 시 `requirePlanApproval=true`를 필수로 지정하여, 사용자 승인 없이 파일 변경이나 브랜치/PR이 생성되는 것을 원천 차단합니다.
+- **실제 main 시작 검증**: 세션은 반드시 실제 원격 `origin/main` 브랜치에서 시작해야 하며, 시작 전 기준 SHA가 `origin/main`과 일치하는지 확인합니다.
+- **자동화 금지**: 자동 승인, 자동 검토, 자동 병합, 자동 배포, 자동 재시도, 자동 재작업은 철저히 금지됩니다. (단, 프롬프트가 비민감한 특정 VM 오류 1회 재전달 예외 제외)
+- **1:1:1 사후 결속 검증**: 예상 브랜치명을 선제적으로 결속에 사용하지 않습니다. 세션이 완료된 후, 실제 생성된 작업 브랜치명과 PR 번호가 Session ID와 정확히 1:1:1로 매칭되는지 확인하는 사후 결속 검증을 수행하며, 불일치 시 `NEEDS_HUMAN_REVIEW`로 전환합니다.
