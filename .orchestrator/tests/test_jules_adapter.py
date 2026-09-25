@@ -984,6 +984,44 @@ class TestRealJulesAdapter(unittest.TestCase):
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 1)
 
+    def test_content_review_fetch_handles_envelope_meta_fields(self) -> None:
+        self.mock_transport.response_to_return = {
+            "activities": [
+                {
+                    "createTime": "2026-09-24T00:00:00Z",
+                    "originator": "JULES",
+                    "artifacts": [{"id": "artifact-1"}],
+                    "planGenerated": {"plan": {"steps": [{"title": "Step 1"}]}}
+                }
+            ]
+        }
+
+        result = self.adapter.fetch_raw_activities_for_content_review("sessions/ses-real-001")
+
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0][0].isoformat(), "2026-09-24T00:00:00+00:00")
+        self.assertIn("planGenerated", result[0][1])
+
+    def test_content_review_fetch_skips_user_message(self) -> None:
+        self.mock_transport.response_to_return = {
+            "activities": [
+                {
+                    "createTime": "2026-09-24T00:00:00Z",
+                    "planApproved": {}
+                },
+                {
+                    "createTime": "invalid-time",
+                    "userMessaged": {"userMessage": "secret user message"}
+                }
+            ]
+        }
+
+        result = self.adapter.fetch_raw_activities_for_content_review("sessions/ses-real-001")
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)
+        self.assertIn("planApproved", result[0][1])
+
     def test_content_review_fetch_error_masks_invalid_reason_code(self) -> None:
         error = ContentReviewFetchError("invalid reason with text")
 

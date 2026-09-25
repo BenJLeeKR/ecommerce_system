@@ -49,3 +49,4 @@
 - [WL-0046](WL-0046-2026-09-25-orchestrator-plan-session-registration-integration.md) — Dispatch 성공 세션의 명시적 Plan 단계 등록 연결과 안전 실패 경계를 추가했다.
 - [WL-0047](WL-0047-2026-09-25-orchestrator-registered-plan-review-entrypoint.md) — 외부 저장소 기반 수동 Plan 검토 단일 진입점을 추가하고 1:1:1 결속 유예 기준을 문서화했다.
 - [WL-0048](WL-0048-2026-09-25-orchestrator-jules-api-execution-protocol.md) — Codex-Jules 안전 API 실행 절차 및 결속 기준(비영속 경계 포함)을 정합화했다.
+- [WL-0049](WL-0049-2026-09-25-orchestrator-actual-activity-schema-alignment.md) — Orchestrator 실제 Activity Schema 및 userMessaged 처리 정책 정합화했다.
