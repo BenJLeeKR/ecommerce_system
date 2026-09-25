@@ -16,11 +16,14 @@ Orchestrator는 상태, 컨텍스트, 작업 기록을 유지하기 위해 SQLit
 
 - **Dispatch 진입점 의존성 주입 및 미접근 경계**: `execute_dispatch_session` 호출 시 `source_name`, `prompt`, 어댑터, 명시적 세션 생성 권한(`is_session_creation_authorized`)이 주입되며, 사전 검증을 통해 유효한 TaskContract와 ApprovalEvidence만 세션으로 인계한다. 승인 증적과의 명시적 대조(task_id, contract_version), 동적 자동 적격성 평가(`evaluate_dispatch_policy`) 및 source_name 사전 검증을 수행한다. 검증 실패 시 API 및 외부 DB 호출을 원천 차단하며, 성공한 명시적 런타임 호출에 한해 API 접근을 허용하고 실제 결속 기록(외부 DB 쓰기)은 후속 Task로 분리하여 안전 경계를 유지한다. 또한 `prompt`와 `source_name` 값은 절대 로그, Worklog 등에 노출하거나 기록하지 않는다.
 - **Jules 검토 인계 과정의 의존성 주입**: 완료된 작업의 1:1:1 결속(PersistentSessionBinding) 영속화는 `execute_review_handoff` 호출 시 외부에서 주입된 저장소 팩토리(`jules_state_repository_factory`)를 통해 이루어진다.
-  - (현재 인계 시 실제 1:1:1 결속 데이터는 미기록 상태로 남아 있으며, Dispatch 단계 이후 후속 실제 결속 기록 단계에서 활성화될 예정이다.)
+  - (사전 검증과 무관한 Plan 단계 비민감 등록은 1:1:1 최종 결속과 구분되어 처리된다.)
 - **지연 초기화 및 우선순위**: 팩토리는 검증이 완료되어 상태가 `RESULT_COLLECTED`로 판정된 이후에만 지연 호출된다. 테스트나 기존 구현에 의해 `repository` 인스턴스가 직접 주입된 경우, 직접 주입된 인스턴스가 팩토리보다 우선하며 팩토리는 호출되지 않는다.
 - **하위 호환성 유지**: 직접 주입된 저장소와 팩토리가 모두 없는 경우에는 기존과 동일하게 영속화 단계를 건너뛰고 정상적으로 검토 인계가 진행된다.
 - **오류 처리 방침**: 팩토리를 통한 저장소 초기화 과정에서 예외가 발생하거나 결속 데이터 저장에 실패하는 경우, 원시 예외를 노출하거나 알림을 보내지 않고 무저장 상태로 즉시 `NEEDS_HUMAN_REVIEW` 전이를 반환한다.
-- **최종 1:1:1 결속 기록 기준**: 최종 결속 기록은 API 호출 완료 후 검증된 실제 산출물(브랜치명, PR 번호)과 모든 식별자(Session ID, Task ID 등) 및 승인 해시가 완벽히 일치할 때만 외부 DB에 수행됩니다. 불일치 시 기록하지 않으며 `NEEDS_HUMAN_REVIEW`로 전환합니다.
+- **최종 1:1:1 결속 기록 기준 및 운영 원칙**: 최종 결속 기록은 검증된 실제 산출물(브랜치명, PR 번호)과 세션, Task, 승인 해시 등 모든 식별자 및 사전 조건이 완벽히 일치할 때만 확립된 Codex 절차를 통해 외부 DB에 기록을 수행한다.
+  - 불일치 시 어떠한 기록도 수행하지 않으며, 즉시 `NEEDS_HUMAN_REVIEW` 상태로 중단한다.
+  - 모든 사전 조건이 충족되어 결속 기록이 이루어질 때는 항목별로 별도의 추가적인 사용자 승인을 반복하여 요구하지 않는다.
+  - 단, Contract 범위(allowed_paths, forbidden_paths), 작업 목표, 위험도, 기준 SHA 등이 변경되는 경우에는 여전히 새 Contract 수립 및 명시적인 사용자 승인이 필수적으로 요구된다.
 
 
 - **Plan 단계 등록 연결 지점**: execute_dispatch_session은 기존 사전 검증을 통과하고 Jules 세션 생성 결과가 CREATED일 때만, 외부에서 명시적으로 주입된 Plan 세션 저장소에 비민감 등록을 요청한다. 저장소가 주입되지 않은 기존 호출은 기존 세션 생성 반환을 유지한다. 등록 실패 시 세션 생성 API를 재호출하지 않고 고정 사유 코드의 NEEDS_HUMAN_REVIEW로 전이한다. 이 연결은 원문 Plan·활동·프롬프트를 다루지 않으며 실제 Runtime DB 경로를 직접 조회하지 않는다.
