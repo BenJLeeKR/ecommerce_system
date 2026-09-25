@@ -1,4 +1,4 @@
-# AN-0010: Registered Content Review Live POC Analysis (2026-09-25)
+# AN-0010: 등록된 콘텐츠 검토 Live POC 분석 (2026-09-25)
 
 ## 개요
 본 문서는 등록된 Jules Plan 세션을 대상으로 Codex가 Pre-PR 수동 콘텐츠 검토 진입점을 사용자 지시 시 1회 적용하는 Live POC의 비민감 절차, 검증 경계 및 제한 사항을 분석합니다.
@@ -24,3 +24,8 @@
 
 ## 롤백 정책
 *   **수동 롤백 방식**: 단일 PR로 구성되며, 미병합 시에는 해당 PR을 종료(Close)하고, 병합 후 문제가 발생할 경우 해당 merge commit을 revert합니다. 어떠한 경우에도 자동 롤백이나 자동 병합은 허용되지 않습니다.
+
+## Live POC 실행 결과 (비민감 기록)
+*   **결과**: 안전 중단 (NEEDS_HUMAN_REVIEW)
+*   **사유 코드**: `INVALID_PROGRESS_UPDATED_FORMAT`
+*   **비고**: 자동 재시도 및 자동 재작업 금지 정책에 따라 추가적인 후속 작업 없이 안전하게 중단되었습니다. (원문, 프롬프트, 활동, 로그, 식별자, API/DB 접근값은 안전 기록 원칙에 따라 생략됨)

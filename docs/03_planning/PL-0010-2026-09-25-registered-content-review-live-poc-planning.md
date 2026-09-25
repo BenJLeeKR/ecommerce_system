@@ -1,4 +1,4 @@
-# PL-0010: Registered Content Review Live POC Planning (2026-09-25)
+# PL-0010: 등록된 콘텐츠 검토 Live POC 기획 (2026-09-25)
 
 ## 목적
 등록된 Jules Plan 세션을 대상으로 Codex가 Pre-PR 수동 콘텐츠 검토 진입점을 사용자 지시 시 1회 적용하는 Live POC의 실행 계획과 비민감 결과 전달 방식을 기획합니다.
