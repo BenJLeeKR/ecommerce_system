@@ -961,7 +961,7 @@ class RealJulesAdapter(JulesAdapter):
 
                 union_keys = [
                     key for key in act.keys()
-                    if key not in ("createTime", "name", "id", "metadata")
+                    if key not in ("createTime", "name", "id", "originator", "artifacts", "metadata")
                 ]
                 if len(union_keys) != 1:
                     raise ContentReviewFetchError("INVALID_EVENT_STRUCTURE")

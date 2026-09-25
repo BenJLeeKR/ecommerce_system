@@ -220,6 +220,7 @@ class TestJulesContentReviewReader(unittest.TestCase):
             "activities": [
                 {
                     "createTime": "2026-09-24T00:01:00Z",
+                    "originator": "JULES",
                     "planGenerated": { "plan": { "steps": [{"title": "Step 1"}] } }
                 },
                 {
@@ -266,6 +267,9 @@ class TestJulesContentReviewReader(unittest.TestCase):
             ]),
             ("sessionFailed with unknown body", [
                 {"createTime": "2026-09-24T00:01:00Z", "sessionFailed": {"reason": "unknown"}}
+            ]),
+            ("unrecognized meta fields", [
+                {"createTime": "2026-09-24T00:01:00Z", "unknownMeta": "value", "planGenerated": {"plan": {"steps": [{"title": "1"}]}}}
             ]),
             ("missing title in planGenerated step", [
                 {"createTime": "2026-09-24T00:01:00Z", "planGenerated": {"plan": {"steps": [{"description": "only desc"}]}}}
