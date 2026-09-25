@@ -49,3 +49,12 @@
 ContentReviewFetchError는 사유 코드 외 자유 문자열이나 원시 데이터를 보유하지 않습니다. Reader는 허용된 안전 예외만 처리하며, 허용되지 않은 예외나 사유 코드는 고정 내부 실패 코드로 전환합니다. 기존 Fake Adapter가 None을 반환하는 경우에는 기존 RAW_ACTIVITIES_FETCH_FAILED fallback을 유지합니다.
 
 이 분류는 수동 검토의 실패 원인을 비민감하게 구분하기 위한 것이며, 자동 승인·자동 검토·자동 병합·자동 배포·자동 재시도 기능을 추가하지 않습니다.
+
+## 6. Pre-PR 수동 콘텐츠 검토 진입점
+
+Codex가 실제 콘텐츠 검토를 수행하기 위해 진입하는 경우, 아직 브랜치와 PR이 생성되기 전이므로(Pre-PR) 1:1:1 Session-Branch-PR 결속 검증이 불가능합니다. 이를 지원하기 위해 다음 정책에 따라 신규 진입점(`manual_registered_content_review_entrypoint.py`)을 운영합니다.
+
+- **비영속 요청 객체**: `ManualRegisteredContentReviewRequest`를 사용하며 모든 내부 식별자는 `<REDACTED>` 마스킹 처리되어 로그와 직렬화 시 유출을 방지합니다.
+- **등록된 Plan 세션 검증**: StateRepository에서 세션 ID를 조회하여 Contract 및 ACTIVE `ApprovalEvidence`와 대조합니다. 특히 정규화된 Contract 해시와 Scope 해시가 일치하는지 엄격히 확인합니다.
+- **결속 유예 원칙**: 이 진입점은 PR 전 검토를 목적으로 하므로 `branch_name`, `pr_number` 결속 검사는 유예되지만, 추후 진행될 Post-PR 진입점(`manual_content_review_entrypoint.py`)의 1:1:1 결속 검증 요구사항은 절대 변경되거나 완화되지 않습니다.
+- **1회 위임 보장**: 검증이 성공하면 기존 `jules_content_review_reader.py`를 단 1회 호출하여 안전하게 원문을 위임 조회합니다. 실패 시 API나 리더 호출은 0회로 제한되고 `NEEDS_HUMAN_REVIEW`가 반환됩니다.
