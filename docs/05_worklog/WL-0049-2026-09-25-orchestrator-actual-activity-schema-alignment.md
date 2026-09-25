@@ -2,7 +2,7 @@
 
 - **작성일**: 2026-09-25 (KST)
 - **작성자**: Jules
-- **태스크 ID**: TASK-123 (비민감 문서 갱신 및 Adapter 갱신)
+- **태스크 ID**: 비민감 문서 갱신 및 Adapter 갱신
 - **상태**: 완료
 
 ## 1. 목적
@@ -30,4 +30,5 @@
 - 전체 테스트(`PYTHONPATH=.orchestrator/src python3 -m unittest discover -s .orchestrator/tests`) 정상 통과 확인.
 - `git diff --check`를 통한 포맷팅 및 공백 에러 없음 확인.
 - `git diff --name-only`를 통해 정확히 6개의 허용 경로만 변경되었음 확인.
+- Markdown 링크 유효성 검증 수행 및 정상 통과 확인.
 - 비민감 진단 실패 및 롤백 요건 충족, 문서 내 원시/비밀값 미포함 재확인.
