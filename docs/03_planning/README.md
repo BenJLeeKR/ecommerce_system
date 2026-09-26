@@ -10,3 +10,4 @@
 - [PL-0006](PL-0006-2026-09-09-github-and-jules-guardrails.md) — GitHub 보호 규칙과 Jules 최소 권한 적용의 사전 점검·승인 범위를 계획했다.
 - [PL-0007](PL-0007-2026-09-09-github-ruleset-and-jules-minimum-permissions.md) — GitHub ruleset과 Jules 최소 권한의 정확한 설정값을 제안했다.
 - [PL-0008](PL-0008-2026-09-09-mvp-scalability-guardrails.md) — AN-0005에 따른 MVP 확장성 가드레일 계획을 수립했다.
+- [PL-0010](PL-0010-2026-09-25-registered-content-review-live-poc-planning.md) — 등록된 세션 대상의 Pre-PR 수동 콘텐츠 검토 Live POC 실행 및 비민감 결과 전달 계획을 수립했다.

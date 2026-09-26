@@ -50,3 +50,4 @@
 - [WL-0048](WL-0048-2026-09-25-orchestrator-jules-api-execution-protocol.md) — Codex-Jules 안전 API 실행 절차 및 결속 기준(비영속 경계 포함)을 정합화했다.
 - [WL-0049](WL-0049-2026-09-25-orchestrator-actual-activity-schema-alignment.md) — Orchestrator 실제 Activity Schema 및 userMessaged 처리 정책 정합화했다.
 - [WL-0050](WL-0050-2026-09-25-orchestrator-manual-content-review-live-poc.md) — 등록된 외부 세션을 기반으로 수동 콘텐츠 검토 진입점을 분리하고 Pre-PR 단계의 위임 검증을 문서화했다.
+- [WL-0051](WL-0051-2026-09-25-registered-content-review-live-poc.md) — 등록된 세션 대상의 Pre-PR 수동 콘텐츠 검토 Live POC 절차 및 제한 사항 기획·분석 문서 작성을 완료했다.
